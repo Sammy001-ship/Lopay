@@ -1,0 +1,259 @@
+
+import { Child, Notification, School, Transaction, User } from '../types';
+
+const KEYS = {
+  USERS: 'lopay_users',
+  SCHOOLS: 'lopay_schools',
+  CHILDREN: 'lopay_children',
+  TRANSACTIONS: 'lopay_transactions',
+  NOTIFICATIONS: 'lopay_notifications',
+  CURRENT_USER_ID: 'lopay_current_user_id',
+};
+
+const get = <T>(key: string): T | null => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  } catch (e) {
+    console.error(`Error reading ${key} from storage`, e);
+    return null;
+  }
+};
+
+const set = <T>(key: string, value: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error(`Error writing ${key} to storage`, e);
+  }
+};
+
+const DEMO_USER_ID = 'user-demo-1';
+
+export const API = {
+  init: () => {
+    try {
+        let users = get<User[]>(KEYS.USERS) || [];
+        const adminEmail = 'admin@lopay.app';
+        const demoEmail = 'demo@lopay.app';
+        const schoolOwnerEmail = 'owner@febison.com';
+
+        let adminExists = false;
+        let demoExists = false;
+        let schoolOwnerExists = false;
+        let needsUpdate = false;
+
+        users = users.map(u => {
+            if (u.email.toLowerCase() === adminEmail) adminExists = true;
+            if (u.email.toLowerCase() === demoEmail) demoExists = true;
+            if (u.email.toLowerCase() === schoolOwnerEmail) schoolOwnerExists = true;
+            return u;
+        });
+
+        if (!adminExists) {
+            users.push({
+                id: 'admin-1',
+                name: 'System Admin',
+                email: adminEmail,
+                password: 'admin',
+                role: 'owner',
+                createdAt: new Date().toISOString()
+            });
+            needsUpdate = true;
+        }
+
+        if (!demoExists) {
+            users.push({
+                id: DEMO_USER_ID,
+                name: 'Demo Parent',
+                email: demoEmail,
+                password: 'demo',
+                role: 'parent',
+                createdAt: new Date().toISOString()
+            });
+            needsUpdate = true;
+        }
+
+        if (!schoolOwnerExists) {
+            users.push({
+                id: 'school-owner-1',
+                name: 'Febison Bursar',
+                email: schoolOwnerEmail,
+                password: 'owner',
+                role: 'school_owner',
+                schoolId: 'sch_febison',
+                createdAt: new Date().toISOString()
+            });
+            needsUpdate = true;
+        }
+        
+        if (needsUpdate || !get(KEYS.USERS)) {
+            set(KEYS.USERS, users);
+        }
+
+        const currentSchools = get<School[]>(KEYS.SCHOOLS);
+        if (!currentSchools || currentSchools.length === 0) {
+            const defaultSchools: School[] = [
+                {
+                    id: 'sch_febison',
+                    name: 'Febison Montessori Groomers School',
+                    address: '106, C.A.C Agbeye Junction, Eyita, Ikorodu, Lagos',
+                    contactEmail: 'info@febison.edu.ng',
+                    studentCount: 45
+                },
+                {
+                    id: 'sch_westhills',
+                    name: 'Westhills School',
+                    address: 'Westhills avenue, Eyita, Ikorodu, Lagos',
+                    contactEmail: 'admin@westhills.edu.ng',
+                    studentCount: 30
+                },
+                {
+                    id: 'sch_inglewood',
+                    name: 'Inglewood School',
+                    address: 'Oshewa street, Ori-Okuta, Ikorodu, Lagos',
+                    contactEmail: 'contact@inglewood.edu.ng',
+                    studentCount: 22
+                }
+            ];
+            set(KEYS.SCHOOLS, defaultSchools);
+        }
+
+        if (localStorage.getItem(KEYS.CHILDREN) === null) set(KEYS.CHILDREN, []);
+        if (localStorage.getItem(KEYS.TRANSACTIONS) === null) set(KEYS.TRANSACTIONS, []);
+        if (localStorage.getItem(KEYS.NOTIFICATIONS) === null) set(KEYS.NOTIFICATIONS, []);
+    } catch (e) {
+        console.error("API Initialization failed", e);
+    }
+  },
+
+  auth: {
+    getCurrentUserId: () => localStorage.getItem(KEYS.CURRENT_USER_ID),
+    setCurrentUserId: (id: string | null) => {
+      if (id) localStorage.setItem(KEYS.CURRENT_USER_ID, id);
+      else localStorage.removeItem(KEYS.CURRENT_USER_ID);
+    },
+    login: (email: string, password?: string): User | null => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (user && user.password === password) return user;
+      return null;
+    },
+    getUserById: (id: string): User | null => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      return users.find(u => u.id === id) || null;
+    }
+  },
+
+  users: {
+    list: () => get<User[]>(KEYS.USERS) || [],
+    create: (user: User) => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      const updated = [...users, user];
+      set(KEYS.USERS, updated);
+      return updated;
+    },
+    delete: (id: string) => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      const updatedUsers = users.filter(u => u.id !== id);
+      set(KEYS.USERS, updatedUsers);
+      const children = get<Child[]>(KEYS.CHILDREN) || [];
+      const updatedChildren = children.filter(c => c.parentId !== id);
+      set(KEYS.CHILDREN, updatedChildren);
+      const transactions = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
+      const updatedTransactions = transactions.filter(t => t.userId !== id);
+      set(KEYS.TRANSACTIONS, updatedTransactions);
+      const notifications = get<Notification[]>(KEYS.NOTIFICATIONS) || [];
+      const updatedNotifications = notifications.filter(n => n.userId !== id);
+      set(KEYS.NOTIFICATIONS, updatedNotifications);
+      return updatedUsers;
+    }
+  },
+
+  schools: {
+    list: () => get<School[]>(KEYS.SCHOOLS) || [],
+    add: (school: School) => {
+      const schools = get<School[]>(KEYS.SCHOOLS) || [];
+      const updated = [school, ...schools];
+      set(KEYS.SCHOOLS, updated);
+      return updated;
+    },
+    update: (school: School) => {
+      const schools = get<School[]>(KEYS.SCHOOLS) || [];
+      const updated = schools.map(s => s.id === school.id ? school : s);
+      set(KEYS.SCHOOLS, updated);
+      return updated;
+    },
+    delete: (id: string) => {
+      const schools = get<School[]>(KEYS.SCHOOLS) || [];
+      const schoolToDelete = schools.find(s => s.id === id);
+      const updatedSchools = schools.filter(s => s.id !== id);
+      set(KEYS.SCHOOLS, updatedSchools);
+      if (schoolToDelete) {
+          const schoolName = schoolToDelete.name;
+          const children = get<Child[]>(KEYS.CHILDREN) || [];
+          const updatedChildren = children.filter(c => c.school !== schoolName);
+          set(KEYS.CHILDREN, updatedChildren);
+          const transactions = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
+          const updatedTransactions = transactions.filter(t => t.schoolName !== schoolName);
+          set(KEYS.TRANSACTIONS, updatedTransactions);
+      }
+      return updatedSchools;
+    },
+    deleteAll: () => {
+      set(KEYS.SCHOOLS, []);
+      set(KEYS.CHILDREN, []);
+      set(KEYS.TRANSACTIONS, []);
+      return [];
+    }
+  },
+
+  children: {
+    list: () => get<Child[]>(KEYS.CHILDREN) || [],
+    add: (child: Child) => {
+      const children = get<Child[]>(KEYS.CHILDREN) || [];
+      const updated = [...children, child];
+      set(KEYS.CHILDREN, updated);
+      return updated;
+    },
+    updateAll: (children: Child[]) => {
+      set(KEYS.CHILDREN, children);
+      return children;
+    },
+    delete: (id: string) => {
+      const children = get<Child[]>(KEYS.CHILDREN) || [];
+      const updated = children.filter(c => c.id !== id);
+      set(KEYS.CHILDREN, updated);
+      const transactions = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
+      const updatedTx = transactions.filter(t => t.childId !== id);
+      set(KEYS.TRANSACTIONS, updatedTx);
+      return updated;
+    }
+  },
+
+  transactions: {
+    list: () => get<Transaction[]>(KEYS.TRANSACTIONS) || [],
+    add: (transaction: Transaction) => {
+      const list = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
+      const updated = [transaction, ...list];
+      set(KEYS.TRANSACTIONS, updated);
+      return updated;
+    },
+    updateAll: (transactions: Transaction[]) => {
+      set(KEYS.TRANSACTIONS, transactions);
+      return transactions;
+    }
+  },
+
+  notifications: {
+    list: () => get<Notification[]>(KEYS.NOTIFICATIONS) || [],
+    add: (notification: Notification) => {
+      const list = get<Notification[]>(KEYS.NOTIFICATIONS) || [];
+      const updated = [notification, ...list];
+      set(KEYS.NOTIFICATIONS, updated);
+      return updated;
+    }
+  }
+};
+
+API.init();
