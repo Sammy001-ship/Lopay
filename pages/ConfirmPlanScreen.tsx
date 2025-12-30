@@ -12,6 +12,7 @@ interface LocationState {
     grade: string;
     totalFee: number;
     plan: PaymentPlan;
+    depositAmount: number;
 }
 
 const ConfirmPlanScreen: React.FC = () => {
@@ -24,10 +25,16 @@ const ConfirmPlanScreen: React.FC = () => {
 
   if (!state) return null;
 
-  const { childName, schoolName, grade, totalFee, plan } = state;
-  const serviceFee = totalFee * 0.025; // 2.5% fee
-  const finalTotal = totalFee + serviceFee;
-  const installmentAmount = finalTotal / plan.numberOfPayments;
+  const { childName, schoolName, grade, totalFee, plan, depositAmount } = state;
+  
+  // Platform Fee is 2.5% of the total tuition
+  const platformFee = totalFee * 0.025;
+  
+  // Initial Payment to activate = 25% Deposit + 2.5% Platform Fee
+  const initialActivationPayment = depositAmount + platformFee;
+  
+  // Standard installment amount for later (remaining 75% / plan length)
+  const futureInstallmentAmount = (totalFee * 0.75) / plan.numberOfPayments;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -40,27 +47,28 @@ const ConfirmPlanScreen: React.FC = () => {
       const childId = Date.now().toString();
 
       setTimeout(() => {
-          // 1. Register the child
+          // 1. Register the child with totalFee (tuition only) or including fees? 
+          // Usually better to track tuition total as the baseline.
           addChild({
               id: childId,
               name: childName,
               school: schoolName,
               grade: grade,
-              totalFee: finalTotal,
+              totalFee: totalFee, 
               paidAmount: 0,
-              nextInstallmentAmount: installmentAmount,
-              nextDueDate: 'In 7 days',
+              nextInstallmentAmount: futureInstallmentAmount,
+              nextDueDate: 'After Activation',
               status: 'On Track',
               avatarUrl: `https://ui-avatars.com/api/?name=${childName.replace(' ','+')}&background=random`
           });
 
-          // 2. Create the first pending transaction for the bursar to approve
+          // 2. Create the first pending transaction (The 25% + 2.5% activation)
           addTransaction({
-              id: `tx-${Date.now()}`,
+              id: `tx-activation-${Date.now()}`,
               childId: childId,
               childName: childName,
               schoolName: schoolName,
-              amount: installmentAmount,
+              amount: initialActivationPayment,
               date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
               status: 'Pending'
           });
@@ -72,72 +80,72 @@ const ConfirmPlanScreen: React.FC = () => {
 
   return (
     <Layout>
-       <Header title="Confirm Your Plan" />
+       <Header title="Activate Your Plan" />
        
        <div className="flex-1 p-6 overflow-y-auto pb-32">
-          {/* User Profile Snippet */}
-          <div className="flex items-center gap-4 mb-8 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-              <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-2xl overflow-hidden">
+          {/* Child Preview */}
+          <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-gray-800">
+              <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-2xl overflow-hidden shadow-inner">
                   <img 
                     src={`https://ui-avatars.com/api/?name=${childName.replace(' ','+')}&background=random`} 
                     alt="child"
                     className="w-full h-full object-cover"
                   />
               </div>
-              <div>
-                  <h3 className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">{childName}</h3>
-                  <p className="text-text-secondary-light dark:text-text-secondary-dark">{schoolName}</p>
+              <div className="flex-1">
+                  <h3 className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark leading-tight">{childName}</h3>
+                  <p className="text-xs text-text-secondary-light font-medium uppercase tracking-tight">{grade} • {schoolName}</p>
               </div>
           </div>
 
-          <div className="text-center mb-6">
-              <p className="text-text-secondary-light">Total School Fee</p>
-              <p className="text-4xl font-extrabold text-text-primary-light dark:text-text-primary-dark">₦{finalTotal.toLocaleString()}</p>
+          <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden mb-6">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Initial Activation Fee</p>
+              <h2 className="text-4xl font-extrabold tracking-tight mb-2">₦{initialActivationPayment.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
+              <div className="flex items-center gap-2 mt-4 text-xs font-bold text-primary-light bg-primary/10 w-fit px-3 py-1.5 rounded-lg border border-primary/20">
+                  <span className="material-symbols-outlined text-sm">verified</span>
+                  25% Deposit + 2.5% Platform Fee
+              </div>
           </div>
 
-          <div className="bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-6">
-              <h3 className="font-bold text-lg mb-4">Your {plan.type} Plan</h3>
-              <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                  <div>
-                      <p className="text-xs text-text-secondary-light uppercase tracking-wider">Installment</p>
-                      <p className="font-bold text-lg">₦{installmentAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {plan.frequencyLabel}</p>
+          <div className="bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-6">
+              <h3 className="font-bold text-base mb-4 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-xl">schedule</span>
+                  Installment Details
+              </h3>
+              <div className="space-y-4">
+                  <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800">
+                      <span className="text-sm text-text-secondary-light">Subsequent Payments</span>
+                      <span className="font-bold">₦{futureInstallmentAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {plan.frequencyLabel}</span>
                   </div>
-                  <div>
-                      <p className="text-xs text-text-secondary-light uppercase tracking-wider">Payments</p>
-                      <p className="font-bold text-lg">{plan.numberOfPayments} {plan.type} Payments</p>
-                  </div>
-                  <div>
-                      <p className="text-xs text-text-secondary-light uppercase tracking-wider">Start Date</p>
-                      <p className="font-bold text-lg">Today</p>
-                  </div>
-                  <div>
-                      <p className="text-xs text-text-secondary-light uppercase tracking-wider">Duration</p>
-                      <p className="font-bold text-lg">3 Months</p>
+                  <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800">
+                      <span className="text-sm text-text-secondary-light">Total Duration</span>
+                      <span className="font-bold">3 Months ({plan.numberOfPayments} installments)</span>
                   </div>
               </div>
           </div>
 
           <div className="mb-6">
-              <h3 className="font-bold text-lg mb-3">Initial Payment Required</h3>
-              <div className="bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-5 shadow-sm">
+              <h3 className="font-bold text-base mb-3 text-text-primary-light dark:text-text-primary-dark">Activation Transfer</h3>
+              <div className="bg-white dark:bg-card-dark border border-primary/30 dark:border-primary/50 rounded-2xl p-5 shadow-lg shadow-primary/5 ring-1 ring-primary/10">
                    <p className="text-sm text-text-secondary-light mb-4">
-                        To activate this plan, please transfer the first installment of <strong>₦{installmentAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong> to the school's account:
+                        Transfer <strong>₦{initialActivationPayment.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> to the Lopay Escrow to activate installments.
                    </p>
                    
-                   <div className="flex items-center gap-4 mb-4">
-                        <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                   <div className="flex items-center gap-4 mb-5">
+                        <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
                              <span className="material-symbols-outlined">account_balance</span>
                         </div>
                         <div>
-                             <p className="font-bold text-lg text-text-primary-light dark:text-text-primary-dark">Lopay Escrow (Schools)</p>
-                             <p className="text-sm text-text-secondary-light font-medium">Opay / 9090390581</p>
+                             <p className="font-bold text-text-primary-light dark:text-text-primary-dark">Lopay Escrow</p>
+                             <p className="text-xs text-text-secondary-light font-bold">Opay • 9090390581</p>
                         </div>
                    </div>
                    
                    <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-                       <span className="font-mono text-xl font-bold tracking-wider text-text-primary-light dark:text-text-primary-dark">9090390581</span>
+                       <span className="font-mono text-xl font-bold tracking-widest text-text-primary-light dark:text-text-primary-dark">9090390581</span>
                         <button 
-                            className="text-primary text-sm font-bold flex items-center gap-1 hover:bg-primary/10 px-2 py-1 rounded transition-colors" 
+                            className="bg-primary text-white text-xs font-bold flex items-center gap-1 hover:bg-primary-dark px-3 py-2 rounded-lg transition-all shadow-md active:scale-95" 
                             onClick={() => copyToClipboard("9090390581")}
                         >
                            <span className="material-symbols-outlined text-sm">content_copy</span> Copy
@@ -146,20 +154,24 @@ const ConfirmPlanScreen: React.FC = () => {
               </div>
           </div>
 
-          <div>
-              <h3 className="font-bold text-lg mb-3">Breakdown</h3>
-              <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                      <span className="text-text-secondary-light">Tuition Fee</span>
-                      <span className="font-medium">₦{totalFee.toLocaleString()}</span>
+          <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-gray-800">
+              <h3 className="font-bold text-sm mb-3 uppercase tracking-wider text-text-secondary-light">Full Cost Breakdown</h3>
+              <div className="space-y-2.5">
+                  <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary-light">Initial Tuition Deposit (25%)</span>
+                      <span className="font-medium">₦{depositAmount.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                      <span className="text-text-secondary-light">Service Fee (2.5%)</span>
-                      <span className="font-medium">₦{serviceFee.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary-light">Platform Setup Fee (2.5%)</span>
+                      <span className="font-medium text-primary">₦{platformFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary-light">Tuition Balance (75%)</span>
+                      <span className="font-medium">₦{(totalFee * 0.75).toLocaleString()}</span>
                   </div>
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2 flex justify-between font-bold text-base">
-                      <span>Total</span>
-                      <span>₦{finalTotal.toLocaleString()}</span>
+                      <span>Grand Total</span>
+                      <span>₦{(totalFee + platformFee).toLocaleString()}</span>
                   </div>
               </div>
           </div>
@@ -169,19 +181,19 @@ const ConfirmPlanScreen: React.FC = () => {
            <button 
              onClick={handleConfirm}
              disabled={isProcessing}
-             className="w-full h-14 bg-primary text-white rounded-xl font-bold text-lg shadow-lg shadow-primary/25 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center transition-all"
+             className="w-full h-14 bg-primary text-white rounded-xl font-bold text-lg shadow-lg shadow-primary/25 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center transition-all hover:opacity-90 active:scale-95"
            >
                {isProcessing ? (
                    <div className="flex items-center gap-2">
                        <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                       <span>Submitting for Approval...</span>
+                       <span>Processing Activation...</span>
                    </div>
                ) : (
-                   'I have sent the money'
+                   'Confirm & Activate Plan'
                )}
            </button>
-           <p className="text-center text-xs text-text-secondary-light mt-3">
-               A bursar will verify your payment within 24 hours.
+           <p className="text-center text-[10px] text-text-secondary-light mt-3 font-medium uppercase tracking-tight">
+               By clicking, you confirm that you have initiated the bank transfer.
            </p>
        </div>
     </Layout>

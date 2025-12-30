@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { BottomNav } from '../components/BottomNav';
@@ -8,6 +8,8 @@ import { useApp } from '../context/AppContext';
 const SchoolOwnerDashboard: React.FC = () => {
   const { transactions, childrenData, schools, currentUser, isOwnerAccount, setActingRole, activeSchoolId } = useApp();
   const navigate = useNavigate();
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth());
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Find the designated school for this owner (taking simulation into account)
   const mySchool = useMemo(() => {
@@ -35,6 +37,59 @@ const SchoolOwnerDashboard: React.FC = () => {
   const handleReturnToAdmin = () => {
       setActingRole('owner');
       navigate('/owner-dashboard');
+  };
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const downloadReport = () => {
+    if (!mySchool) return;
+    setIsGenerating(true);
+
+    setTimeout(() => {
+      // Filter transactions for the selected month and current year
+      const currentYear = new Date().getFullYear();
+      const schoolTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate.getMonth() === reportMonth && tDate.getFullYear() === currentYear;
+      });
+
+      if (schoolTransactions.length === 0) {
+        alert(`No transactions found for ${months[reportMonth]} ${currentYear}`);
+        setIsGenerating(false);
+        return;
+      }
+
+      // Generate CSV content
+      const headers = ["Date", "Parent/Child", "School", "Amount (NGN)", "Status"];
+      const rows = schoolTransactions.map(t => [
+        t.date,
+        t.childName,
+        t.schoolName,
+        t.amount.toString(),
+        t.status
+      ]);
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(r => r.join(","))
+      ].join("\n");
+
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${mySchool.name.replace(/\s+/g, '_')}_Report_${months[reportMonth]}_${currentYear}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setIsGenerating(false);
+    }, 1500); // Simulate processing time
   };
 
   return (
@@ -79,6 +134,45 @@ const SchoolOwnerDashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">₦{(totalOutstanding/1000).toFixed(1)}k</p>
                 <p className="text-xs text-text-secondary-light">Outstanding Fees</p>
             </div>
+        </div>
+
+        {/* Reporting Section */}
+        <div className="bg-white dark:bg-card-dark p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-secondary">analytics</span>
+            <h3 className="text-sm font-bold text-text-primary-light dark:text-text-primary-dark uppercase tracking-wider">Financial Reporting</h3>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-text-secondary-light uppercase">Select Report Month</label>
+              <select 
+                value={reportMonth} 
+                onChange={(e) => setReportMonth(parseInt(e.target.value))}
+                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-secondary/50 text-sm font-medium"
+              >
+                {months.map((m, i) => (
+                  <option key={i} value={i}>{m} {new Date().getFullYear()}</option>
+                ))}
+              </select>
+            </div>
+            <button 
+              onClick={downloadReport}
+              disabled={isGenerating}
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-secondary text-white rounded-xl font-bold shadow-md shadow-secondary/20 hover:opacity-95 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <>
+                  <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <span>Generating CSV...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-lg">file_download</span>
+                  <span>Download Monthly Report</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Quick Actions for Bursar */}
