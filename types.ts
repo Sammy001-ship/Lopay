@@ -5,7 +5,7 @@ export interface User {
   email: string;
   password?: string;
   role: 'parent' | 'owner' | 'school_owner' | 'university_student';
-  schoolId?: string; // Link for school owners or university students to their school
+  schoolId?: string;
   bankName?: string;
   accountName?: string;
   accountNumber?: string;
@@ -35,6 +35,8 @@ export interface Transaction {
   amount: number;
   date: string;
   status: 'Successful' | 'Pending' | 'Failed';
+  // Added receiptUrl for verification flow
+  receiptUrl?: string;
 }
 
 export interface Notification {

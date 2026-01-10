@@ -14,14 +14,15 @@ interface AppContextType {
   deleteChild: (childId: string) => void;
   addTransaction: (transaction: Omit<Transaction, 'userId'>) => void;
   submitPayment: (childId: string, amount: number) => void;
-  approvePayment: (transactionId: string) => void;
-  declinePayment: (transactionId: string) => void;
   addSchool: (school: School) => void;
   updateSchool: (school: School) => void;
   deleteSchool: (schoolId: string) => void;
   deleteAllSchools: () => void;
   deleteUser: (userId: string) => void;
   sendBroadcast: (title: string, message: string) => void;
+  // Added for manual payment verification flow
+  approvePayment: (transactionId: string) => void;
+  declinePayment: (transactionId: string) => void;
   
   isAuthenticated: boolean;
   currentUser: User | null;
@@ -93,7 +94,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const school = schools.find(s => s.id === sId);
       return allChildren.filter(c => c.school === school?.name);
     }
-    // University students track their own tuition plans (linked by parentId)
     return allChildren.filter(c => c.parentId === currentUser?.id);
   }, [allChildren, currentUser, userRole, schools, activeSchoolId]);
 
@@ -235,9 +235,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAllNotifications(updated);
   };
 
+  // Added logic to approve a pending payment and update child balance
+  const approvePayment = (transactionId: string) => {
+    const tx = allTransactions.find((t) => t.id === transactionId);
+    if (!tx) return;
+
+    const updatedTx = allTransactions.map((t) =>
+      t.id === transactionId ? { ...t, status: 'Successful' as const } : t
+    );
+    API.transactions.updateAll(updatedTx);
+    setAllTransactions(updatedTx);
+
+    if (tx.childId) {
+      const updatedChildren = allChildren.map((c) => {
+        if (c.id === tx.childId) {
+          const newPaid = c.paidAmount + tx.amount;
+          const isComplete = newPaid >= c.totalFee;
+          return {
+            ...c,
+            paidAmount: Math.min(newPaid, c.totalFee),
+            status: isComplete ? 'Completed' : ('On Track' as any),
+            nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount,
+          };
+        }
+        return c;
+      });
+      API.children.updateAll(updatedChildren);
+      setAllChildren(updatedChildren);
+    }
+  };
+
+  // Added logic to decline a pending payment
+  const declinePayment = (transactionId: string) => {
+    const updatedTx = allTransactions.map((t) =>
+      t.id === transactionId ? { ...t, status: 'Failed' as const } : t
+    );
+    API.transactions.updateAll(updatedTx);
+    setAllTransactions(updatedTx);
+  };
+
   const submitPayment = (childId: string, amount: number) => {
     const child = allChildren.find((c) => c.id === childId);
     if (!child) return;
+
+    // Direct payment flow - no verification
     const newTrans: Transaction = {
         id: Date.now().toString(),
         userId: child.parentId,
@@ -246,94 +287,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         schoolName: child.school,
         amount: amount,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: 'Pending'
+        status: 'Successful'
     };
+
     const updatedTx = API.transactions.add(newTrans);
     setAllTransactions(updatedTx);
+
+    // Update child balance immediately
+    const updatedChildren = allChildren.map(c => {
+        if (c.id === childId) {
+            const newPaid = c.paidAmount + amount;
+            const isComplete = newPaid >= c.totalFee;
+            return {
+                ...c,
+                paidAmount: Math.min(newPaid, c.totalFee),
+                status: isComplete ? 'Completed' : 'On Track' as any,
+                nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount
+            };
+        }
+        return c;
+    });
+    
+    API.children.updateAll(updatedChildren);
+    setAllChildren(updatedChildren);
+
     const newNotif: Notification = {
         id: Date.now().toString(),
         userId: child.parentId,
         type: 'payment',
-        title: 'Payment Submitted',
-        message: `Verification pending for ${child.name} - ₦${amount.toFixed(2)}`,
-        timestamp: 'Just now',
-        read: false,
-        status: 'warning'
-    };
-    const updatedNotifs = API.notifications.add(newNotif);
-    setAllNotifications(updatedNotifs);
-  };
-
-  const approvePayment = (transactionId: string) => {
-      const currentTxList = API.transactions.list();
-      const currentChildren = API.children.list();
-      let targetTx: Transaction | undefined;
-      const updatedTransactions = currentTxList.map(t => {
-          if (t.id === transactionId) {
-              targetTx = t;
-              return { ...t, status: 'Successful' as const };
-          }
-          return t;
-      });
-      if (!targetTx) return;
-      const updatedChildren = currentChildren.map((child) => {
-          const isMatch = targetTx!.childId
-            ? child.id === targetTx!.childId
-            : (child.name === targetTx!.childName && child.parentId === targetTx!.userId);
-          if (isMatch) {
-              const newPaid = child.paidAmount + targetTx!.amount;
-              const isComplete = newPaid >= child.totalFee;
-              const finalPaid = Math.min(newPaid, child.totalFee);
-              return {
-                  ...child,
-                  paidAmount: finalPaid,
-                  status: isComplete ? 'Completed' : ('On Track' as any),
-                  nextInstallmentAmount: isComplete ? 0 : child.nextInstallmentAmount,
-                  nextDueDate: isComplete ? '-' : child.nextDueDate
-              };
-          }
-          return child;
-      });
-      const successNotif: Notification = {
-        id: Date.now().toString(),
-        userId: targetTx.userId,
-        type: 'payment',
-        title: 'Payment Approved',
-        message: `Your payment of ₦${targetTx.amount.toLocaleString()} for ${targetTx.childName} has been confirmed.`,
+        title: 'Payment Successful',
+        message: `₦${amount.toLocaleString()} has been recorded for ${child.name}.`,
         timestamp: 'Just now',
         read: false,
         status: 'success'
-      };
-      API.transactions.updateAll(updatedTransactions);
-      API.children.updateAll(updatedChildren);
-      const updatedNotifs = API.notifications.add(successNotif);
-      setAllTransactions(updatedTransactions);
-      setAllChildren(updatedChildren);
-      setAllNotifications(updatedNotifs);
-  };
-
-  const declinePayment = (transactionId: string) => {
-      const currentTxList = API.transactions.list();
-      const updatedTransactions = currentTxList.map(t => 
-          t.id === transactionId ? { ...t, status: 'Failed' as const } : t
-      );
-      const targetTx = currentTxList.find(t => t.id === transactionId);
-      API.transactions.updateAll(updatedTransactions);
-      setAllTransactions(updatedTransactions);
-      if (targetTx) {
-          const failNotif: Notification = {
-            id: Date.now().toString(),
-            userId: targetTx.userId,
-            type: 'alert',
-            title: 'Payment Declined',
-            message: `Payment for ${targetTx.childName} was declined. Contact support.`,
-            timestamp: 'Just now',
-            read: false,
-            status: 'error'
-          };
-          const updatedNotifs = API.notifications.add(failNotif);
-          setAllNotifications(updatedNotifs);
-      }
+    };
+    const updatedNotifs = API.notifications.add(newNotif);
+    setAllNotifications(updatedNotifs);
   };
 
   return (
@@ -348,14 +337,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteChild,
         addTransaction,
         submitPayment,
-        approvePayment,
-        declinePayment,
         addSchool,
         updateSchool,
         deleteSchool,
         deleteAllSchools,
         deleteUser,
         sendBroadcast,
+        approvePayment,
+        declinePayment,
         isAuthenticated,
         currentUser,
         userRole,

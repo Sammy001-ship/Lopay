@@ -17,8 +17,6 @@ const OwnerDashboard: React.FC = () => {
 
   const displayRevenue = 45000000 + totalRevenue; 
   
-  const pendingApprovalCount = transactions.filter(t => t.status === 'Pending').length;
-  
   const activeStudents = useMemo(() => {
       const baseCount = schools.reduce((acc, s) => acc + (s.studentCount || 0), 0);
       return baseCount + childrenData.length;
@@ -80,6 +78,7 @@ const OwnerDashboard: React.FC = () => {
     if (activeSchoolNames.length === 0) return;
 
     const interval = setInterval(() => {
+        // Correctly initialize randomName using names.length
         const randomName = names[Math.floor(Math.random() * names.length)];
         const randomSchool = activeSchoolNames[Math.floor(Math.random() * activeSchoolNames.length)];
         const randomAmount = Math.floor(Math.random() * (45000 - 5000 + 1)) + 5000;
@@ -88,7 +87,7 @@ const OwnerDashboard: React.FC = () => {
 
         const newTransaction: Omit<Transaction, 'userId'> = {
             id: Date.now().toString(),
-            childName: randomName,
+            childName: randomName || "Anonymous",
             schoolName: randomSchool,
             amount: randomAmount,
             date: `Today, ${timeString}`,
@@ -105,9 +104,6 @@ const OwnerDashboard: React.FC = () => {
       {/* Top Bar */}
       <div className="sticky top-0 z-10 flex items-center justify-between bg-white dark:bg-background-dark p-6 pb-4 border-b border-gray-100 dark:border-gray-800">
         <h1 className="text-xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">Admin Overview</h1>
-        <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md text-text-secondary-light">System Status: Active</span>
-        </div>
       </div>
 
       <main className="flex flex-col gap-6 p-6 pb-32">
@@ -140,23 +136,6 @@ const OwnerDashboard: React.FC = () => {
                     <span className="text-[10px] font-bold">Owner</span>
                 </button>
             </div>
-            
-            {userRole === 'owner' && schools.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-primary/10">
-                    <p className="text-[10px] text-text-secondary-light font-bold uppercase mb-2">Switch Owner Context To:</p>
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                        {schools.map(s => (
-                            <button 
-                                key={s.id}
-                                onClick={() => handleSwitchRole('school_owner', s.id)}
-                                className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all ${activeSchoolId === s.id ? 'bg-secondary/10 border-secondary text-secondary' : 'bg-gray-50 dark:bg-white/5 border-transparent text-text-secondary-light'}`}
-                            >
-                                {s.name.split(' ')[0]}...
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
 
         {/* Key Metrics */}
@@ -185,20 +164,6 @@ const OwnerDashboard: React.FC = () => {
             <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-3">Operations</h3>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 <button 
-                    onClick={() => navigate('/admin/approvals')}
-                    className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative"
-                >
-                    <div className="relative">
-                        <span className="material-symbols-outlined text-primary">verified</span>
-                        {pendingApprovalCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white ring-2 ring-white dark:ring-card-dark">
-                                {pendingApprovalCount}
-                            </span>
-                        )}
-                    </div>
-                    <span className="text-xs font-bold">Approvals</span>
-                </button>
-                <button 
                     onClick={() => navigate('/admin/add-school')}
                     className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 >
@@ -211,6 +176,13 @@ const OwnerDashboard: React.FC = () => {
                 >
                     <span className="material-symbols-outlined text-purple-500">list_alt</span>
                     <span className="text-xs font-bold">All Schools</span>
+                </button>
+                <button 
+                    onClick={() => navigate('/admin/users')}
+                    className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                >
+                    <span className="material-symbols-outlined text-success">group</span>
+                    <span className="text-xs font-bold">Users</span>
                 </button>
             </div>
         </div>

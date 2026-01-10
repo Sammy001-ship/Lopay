@@ -18,7 +18,6 @@ import AddSchoolScreen from './pages/admin/AddSchoolScreen';
 import BroadcastScreen from './pages/admin/BroadcastScreen';
 import DefaultersScreen from './pages/admin/DefaultersScreen';
 import SchoolListScreen from './pages/admin/SchoolListScreen';
-import PaymentApprovalsScreen from './pages/admin/PaymentApprovalsScreen';
 import CalendarScreen from './pages/CalendarScreen';
 import SettingsScreen from './pages/SettingsScreen';
 import SupportScreen from './pages/SupportScreen';
@@ -65,7 +64,6 @@ const AppRoutes = () => {
       <Route path="/admin/broadcast" element={<ProtectedRoute><BroadcastScreen /></ProtectedRoute>} />
       <Route path="/admin/defaulters" element={<ProtectedRoute><DefaultersScreen /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute><UsersListScreen /></ProtectedRoute>} />
-      <Route path="/admin/approvals" element={<ProtectedRoute><PaymentApprovalsScreen /></ProtectedRoute>} />
 
       <Route path="/add-child" element={<ProtectedRoute><AddChildScreen /></ProtectedRoute>} />
       <Route path="/calculator" element={<ProtectedRoute><CalculatorScreen /></ProtectedRoute>} />

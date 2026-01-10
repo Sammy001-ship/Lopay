@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { Header } from '../../components/Header';
@@ -8,6 +8,7 @@ import { useApp } from '../../context/AppContext';
 const PaymentApprovalsScreen: React.FC = () => {
   const { transactions, approvePayment, declinePayment, userRole } = useApp();
   const navigate = useNavigate();
+  const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
 
   const isSuperAdmin = userRole === 'owner';
   const pendingTransactions = transactions.filter(t => t.status === 'Pending');
@@ -31,16 +32,7 @@ const PaymentApprovalsScreen: React.FC = () => {
                     <span className="material-symbols-outlined text-4xl">lock</span>
                 </div>
                 <h2 className="text-xl font-bold mb-2">Restricted Action</h2>
-                <p className="text-text-secondary-light text-sm mb-8">
-                    Only Lopay System Administrators are authorized to verify and approve financial transactions. 
-                    Please contact support if you believe this is an error.
-                </p>
-                <button 
-                    onClick={() => navigate(-1)}
-                    className="px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg"
-                >
-                    Go Back
-                </button>
+                <button onClick={() => navigate(-1)} className="px-6 py-3 bg-primary text-white rounded-xl font-bold">Go Back</button>
             </div>
           </Layout>
       );
@@ -52,66 +44,55 @@ const PaymentApprovalsScreen: React.FC = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         {pendingTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center opacity-50 pt-20">
-                <div className="size-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
-                     <span className="material-symbols-outlined text-4xl text-gray-400">task_alt</span>
-                </div>
-                <h3 className="text-lg font-bold">All Caught Up!</h3>
-                <p className="text-sm">No pending payments to review.</p>
-                <button 
-                    onClick={() => navigate('/owner-dashboard')}
-                    className="mt-6 text-primary font-bold text-sm"
-                >
-                    Back to Dashboard
-                </button>
+                <p>No pending payments to review.</p>
             </div>
         ) : (
-            <div className="flex flex-col gap-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary">info</span>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                        {pendingTransactions.length} payment{pendingTransactions.length !== 1 ? 's' : ''} waiting for your verification.
-                    </p>
-                </div>
-
+            <div className="flex flex-col gap-6">
                 {pendingTransactions.map(t => (
-                    <div key={t.id} className="bg-white dark:bg-card-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col gap-4">
+                    <div key={t.id} className="bg-white dark:bg-card-dark rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col gap-4">
                         <div className="flex justify-between items-start">
-                             <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center font-bold text-gray-500">
-                                    {t.childName.charAt(0)}
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-text-primary-light dark:text-text-primary-dark">{t.childName}</h3>
-                                    <p className="text-sm text-text-secondary-light">{t.schoolName}</p>
-                                </div>
+                             <div>
+                                <h3 className="font-bold text-text-primary-light dark:text-text-primary-dark">{t.childName}</h3>
+                                <p className="text-xs text-text-secondary-light uppercase font-bold tracking-tight">{t.schoolName}</p>
                              </div>
-                             <div className="text-right">
-                                 <p className="font-bold text-lg text-primary">₦{t.amount.toLocaleString()}</p>
-                                 <p className="text-xs text-text-secondary-light">{t.date}</p>
-                             </div>
+                             <p className="font-bold text-lg text-primary">₦{t.amount.toLocaleString()}</p>
                         </div>
 
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-2">
+                            <p className="text-[10px] font-bold text-text-secondary-light uppercase">Submitted Receipt</p>
                             <button 
-                                onClick={() => handleDecline(t.id)}
-                                className="flex-1 py-3 rounded-xl border border-danger/30 text-danger bg-danger/5 font-bold text-sm hover:bg-danger/10 transition-colors flex items-center justify-center gap-2"
+                                onClick={() => setSelectedReceipt(t.receiptUrl || null)}
+                                className="w-full aspect-video bg-gray-100 dark:bg-white/5 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative group"
                             >
-                                <span className="material-symbols-outlined text-lg">close</span>
-                                Decline
+                                <img src={t.receiptUrl} alt="Receipt" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                    <span className="material-symbols-outlined mr-2">zoom_in</span>
+                                    <span className="text-xs font-bold uppercase">View Receipt</span>
+                                </div>
                             </button>
-                            <button 
-                                onClick={() => handleApprove(t.id)}
-                                className="flex-[2] py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                                <span className="material-symbols-outlined text-lg">check</span>
-                                Approve Payment
-                            </button>
+                        </div>
+
+                        <div className="flex gap-3 mt-2">
+                            <button onClick={() => handleDecline(t.id)} className="flex-1 py-3 rounded-xl border border-danger/30 text-danger bg-danger/5 font-bold text-xs">Decline</button>
+                            <button onClick={() => handleApprove(t.id)} className="flex-[2] py-3 rounded-xl bg-primary text-white font-bold text-xs">Approve Payment</button>
                         </div>
                     </div>
                 ))}
             </div>
         )}
       </div>
+
+      {/* Receipt Preview Modal */}
+      {selectedReceipt && (
+          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-6 items-center justify-center" onClick={() => setSelectedReceipt(null)}>
+              <div className="w-full max-w-md bg-white dark:bg-card-dark rounded-3xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <img src={selectedReceipt} alt="Receipt Full" className="w-full h-auto max-h-[70vh] object-contain" />
+                  <div className="p-6">
+                      <button onClick={() => setSelectedReceipt(null)} className="w-full py-4 bg-primary text-white rounded-xl font-bold">Close Preview</button>
+                  </div>
+              </div>
+          </div>
+      )}
     </Layout>
   );
 };

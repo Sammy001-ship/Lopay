@@ -1,0 +1,10 @@
+
+{
+  "appId": "com.lopay.app",
+  "appName": "LOPAY",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

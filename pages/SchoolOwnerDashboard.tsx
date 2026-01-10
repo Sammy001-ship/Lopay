@@ -24,10 +24,6 @@ const SchoolOwnerDashboard: React.FC = () => {
       .reduce((acc, t) => acc + t.amount, 0);
   }, [transactions]);
 
-  const pendingApprovals = useMemo(() => {
-    return transactions.filter(t => t.status === 'Pending').length;
-  }, [transactions]);
-
   const registeredStudents = childrenData.length;
 
   const totalOutstanding = useMemo(() => {
@@ -49,7 +45,6 @@ const SchoolOwnerDashboard: React.FC = () => {
     setIsGenerating(true);
 
     setTimeout(() => {
-      // Filter transactions for the selected month and current year
       const currentYear = new Date().getFullYear();
       const schoolTransactions = transactions.filter(t => {
         const tDate = new Date(t.date);
@@ -62,7 +57,6 @@ const SchoolOwnerDashboard: React.FC = () => {
         return;
       }
 
-      // Generate CSV content
       const headers = ["Date", "Parent/Child", "School", "Amount (NGN)", "Status"];
       const rows = schoolTransactions.map(t => [
         t.date,
@@ -77,7 +71,6 @@ const SchoolOwnerDashboard: React.FC = () => {
         ...rows.map(r => r.join(","))
       ].join("\n");
 
-      // Create download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -89,12 +82,11 @@ const SchoolOwnerDashboard: React.FC = () => {
       document.body.removeChild(link);
       
       setIsGenerating(false);
-    }, 1500); // Simulate processing time
+    }, 1500); 
   };
 
   return (
     <Layout showBottomNav>
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-background-dark p-6 pb-4 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3 mb-1">
             <div className="size-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
@@ -104,13 +96,12 @@ const SchoolOwnerDashboard: React.FC = () => {
                 <h1 className="text-xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">
                     {mySchool?.name || 'School Dashboard'}
                 </h1>
-                <p className="text-xs text-text-secondary-light font-medium">Designated School Owner Panel</p>
+                <p className="text-xs text-text-secondary-light font-medium">Institution Management Portal</p>
             </div>
         </div>
       </div>
 
       <main className="flex flex-col gap-6 p-6 pb-32">
-        {/* Scoped Metrics */}
         <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 bg-gradient-to-br from-secondary to-primary text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
                 <div className="absolute right-0 top-0 p-4 opacity-10">
@@ -118,16 +109,11 @@ const SchoolOwnerDashboard: React.FC = () => {
                 </div>
                 <p className="text-white/80 text-sm font-medium mb-1">Total School Revenue (Lopay)</p>
                 <h2 className="text-3xl font-bold tracking-tight">₦{totalRevenue.toLocaleString()}</h2>
-                <div className="flex items-center gap-2 mt-4">
-                    <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold">
-                        {registeredStudents} Registered Students
-                    </div>
-                </div>
             </div>
 
             <div className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <p className="text-2xl font-bold text-warning">{pendingApprovals}</p>
-                <p className="text-xs text-text-secondary-light">Pending Verifications</p>
+                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">{registeredStudents}</p>
+                <p className="text-xs text-text-secondary-light">Registered Students</p>
             </div>
 
             <div className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
@@ -136,46 +122,31 @@ const SchoolOwnerDashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* Reporting Section */}
         <div className="bg-white dark:bg-card-dark p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-secondary">analytics</span>
             <h3 className="text-sm font-bold text-text-primary-light dark:text-text-primary-dark uppercase tracking-wider">Financial Reporting</h3>
           </div>
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-text-secondary-light uppercase">Select Report Month</label>
-              <select 
-                value={reportMonth} 
-                onChange={(e) => setReportMonth(parseInt(e.target.value))}
-                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-secondary/50 text-sm font-medium"
-              >
-                {months.map((m, i) => (
-                  <option key={i} value={i}>{m} {new Date().getFullYear()}</option>
-                ))}
-              </select>
-            </div>
+            <select 
+              value={reportMonth} 
+              onChange={(e) => setReportMonth(parseInt(e.target.value))}
+              className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-secondary/50 text-sm font-medium"
+            >
+              {months.map((m, i) => (
+                <option key={i} value={i}>{m} {new Date().getFullYear()}</option>
+              ))}
+            </select>
             <button 
               onClick={downloadReport}
               disabled={isGenerating}
               className="w-full flex items-center justify-center gap-2 py-3.5 bg-secondary text-white rounded-xl font-bold shadow-md shadow-secondary/20 hover:opacity-95 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {isGenerating ? (
-                <>
-                  <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  <span>Generating CSV...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-lg">file_download</span>
-                  <span>Download Monthly Report</span>
-                </>
-              )}
+              {isGenerating ? "Generating..." : "Download Monthly Report"}
             </button>
           </div>
         </div>
 
-        {/* Quick Actions for Bursar */}
         <div>
             <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-3">Tasks</h3>
             <div className="flex gap-3">
@@ -186,34 +157,22 @@ const SchoolOwnerDashboard: React.FC = () => {
                     <span className="material-symbols-outlined">receipt_long</span>
                     Revenue History
                 </button>
-                <button 
-                    onClick={() => navigate('/profile')}
-                    className="flex-1 flex items-center justify-center gap-2 p-4 bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl font-bold hover:bg-gray-50 transition-all"
-                >
-                    <span className="material-symbols-outlined text-secondary">person</span>
-                    Profile
-                </button>
             </div>
         </div>
 
-        {/* Scoped Student List */}
         <div>
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider">Registered Students</h3>
-                <span className="text-[10px] bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded font-bold">{childrenData.length} Total</span>
-            </div>
-            
+            <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-3">Registered Students</h3>
             <div className="flex flex-col gap-3">
                 {childrenData.length === 0 ? (
-                    <div className="text-center p-8 bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
-                        <p className="text-sm text-text-secondary-light">No parents have registered for your school yet.</p>
+                    <div className="text-center p-8 bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 text-sm text-text-secondary-light">
+                        No parents have registered for your school yet.
                     </div>
                 ) : (
                     childrenData.map(child => {
                         const progress = (child.paidAmount / child.totalFee) * 100;
                         return (
                             <div key={child.id} className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                                <div className="flex justify-between items-center mb-3">
+                                <div className="flex justify-between items-center mb-2">
                                     <div className="flex items-center gap-3">
                                         <img src={child.avatarUrl} alt={child.name} className="size-9 rounded-full" />
                                         <div>
@@ -240,7 +199,6 @@ const SchoolOwnerDashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* Return to Admin Floating Button (Only for Admins in Simulation) */}
       {isOwnerAccount && (
         <button
           onClick={handleReturnToAdmin}
