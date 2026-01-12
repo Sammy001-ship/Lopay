@@ -25,6 +25,10 @@ const OwnerDashboard: React.FC = () => {
   const pendingAmount = childrenData
     .reduce((acc, c) => acc + (c.totalFee - c.paidAmount), 0) + 4000000;
 
+  const pendingApprovalsCount = useMemo(() => {
+    return transactions.filter(t => t.status === 'Pending').length;
+  }, [transactions]);
+
   const schoolStats = useMemo(() => {
     return schools.map(school => {
       const revenue = transactions
@@ -57,53 +61,30 @@ const OwnerDashboard: React.FC = () => {
     );
   }, [schoolStats, searchQuery]);
 
-  const handleDeleteSchool = (e: React.MouseEvent, id: string, name: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
-      deleteSchool(id);
-    }
-  };
-
   const handleSwitchRole = (role: 'parent' | 'owner' | 'school_owner', sId?: string) => {
       setActingRole(role, sId);
       if (role === 'parent') navigate('/dashboard');
       if (role === 'school_owner') navigate('/school-owner-dashboard');
   };
 
-  // Real-time inflows simulation
-  useEffect(() => {
-    const names = ["Chinedu O.", "Aisha B.", "Emeka K.", "Funke A.", "David L.", "Sarah M.", "Yusuf I.", "Binta S.", "Tunde A.", "Ngozi E."];
-    const activeSchoolNames = (schools || []).map(s => s.name);
-    if (activeSchoolNames.length === 0) return;
-
-    const interval = setInterval(() => {
-        // Correctly initialize randomName using names.length
-        const randomName = names[Math.floor(Math.random() * names.length)];
-        const randomSchool = activeSchoolNames[Math.floor(Math.random() * activeSchoolNames.length)];
-        const randomAmount = Math.floor(Math.random() * (45000 - 5000 + 1)) + 5000;
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-        const newTransaction: Omit<Transaction, 'userId'> = {
-            id: Date.now().toString(),
-            childName: randomName || "Anonymous",
-            schoolName: randomSchool,
-            amount: randomAmount,
-            date: `Today, ${timeString}`,
-            status: 'Successful'
-        };
-        addTransaction(newTransaction);
-    }, 12000); 
-
-    return () => clearInterval(interval);
-  }, [addTransaction, schools]);
-
   return (
     <Layout showBottomNav>
       {/* Top Bar */}
       <div className="sticky top-0 z-10 flex items-center justify-between bg-white dark:bg-background-dark p-6 pb-4 border-b border-gray-100 dark:border-gray-800">
         <h1 className="text-xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">Admin Overview</h1>
+        <div className="relative">
+             <button 
+                onClick={() => navigate('/admin/approvals')}
+                className="size-10 flex items-center justify-center rounded-full bg-primary/10 text-primary transition-all active:scale-95"
+            >
+                <span className="material-symbols-outlined filled">verified_user</span>
+            </button>
+            {pendingApprovalsCount > 0 && (
+                <span className="absolute -top-1 -right-1 size-5 bg-danger text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-background-dark">
+                    {pendingApprovalsCount}
+                </span>
+            )}
+        </div>
       </div>
 
       <main className="flex flex-col gap-6 p-6 pb-32">
@@ -140,7 +121,7 @@ const OwnerDashboard: React.FC = () => {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+            <div className="col-span-2 bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
                 <div className="absolute right-0 top-0 p-4 opacity-10">
                     <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
                 </div>
@@ -161,36 +142,48 @@ const OwnerDashboard: React.FC = () => {
 
         {/* Quick Actions */}
         <div>
-            <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-3">Operations</h3>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-3 px-1">Operations Control</h3>
+            <div className="grid grid-cols-2 gap-3">
+                <button 
+                    onClick={() => navigate('/admin/approvals')}
+                    className="flex flex-col items-center justify-center gap-2 p-4 bg-primary/10 border border-primary/20 rounded-2xl hover:bg-primary/20 transition-all relative group"
+                >
+                    <span className="material-symbols-outlined text-primary text-2xl filled">verified_user</span>
+                    <span className="text-xs font-bold text-primary">Approvals</span>
+                    {pendingApprovalsCount > 0 && (
+                        <div className="absolute top-2 right-2 size-6 bg-danger text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+                            {pendingApprovalsCount}
+                        </div>
+                    )}
+                </button>
                 <button 
                     onClick={() => navigate('/admin/add-school')}
-                    className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl hover:bg-gray-50 transition-all"
                 >
-                    <span className="material-symbols-outlined text-primary">add_business</span>
-                    <span className="text-xs font-bold">Add School</span>
+                    <span className="material-symbols-outlined text-text-secondary-light">add_business</span>
+                    <span className="text-xs font-bold text-text-primary-light dark:text-text-primary-dark">Add School</span>
                 </button>
                 <button 
                     onClick={() => navigate('/admin/schools')}
-                    className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl hover:bg-gray-50 transition-all"
                 >
-                    <span className="material-symbols-outlined text-purple-500">list_alt</span>
-                    <span className="text-xs font-bold">All Schools</span>
+                    <span className="material-symbols-outlined text-text-secondary-light">list_alt</span>
+                    <span className="text-xs font-bold text-text-primary-light dark:text-text-primary-dark">All Schools</span>
                 </button>
                 <button 
                     onClick={() => navigate('/admin/users')}
-                    className="flex flex-col items-center justify-center gap-2 min-w-[100px] p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 p-4 bg-white dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl hover:bg-gray-50 transition-all"
                 >
-                    <span className="material-symbols-outlined text-success">group</span>
-                    <span className="text-xs font-bold">Users</span>
+                    <span className="material-symbols-outlined text-text-secondary-light">group</span>
+                    <span className="text-xs font-bold text-text-primary-light dark:text-text-primary-dark">Users List</span>
                 </button>
             </div>
         </div>
 
         {/* School Ledger */}
         <div>
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider">Performance by School</h3>
+            <div className="flex items-center justify-between mb-3 px-1">
+                <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider">Institution Ledger</h3>
             </div>
             
             <div className="flex flex-col gap-3">
