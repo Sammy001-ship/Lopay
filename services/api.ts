@@ -82,6 +82,9 @@ export const API = {
                 password: 'owner',
                 role: 'school_owner',
                 schoolId: 'sch_febison',
+                bankName: 'Opay',
+                accountName: 'Febison Montessori Groomers',
+                accountNumber: '8101234567',
                 createdAt: new Date().toISOString()
             });
             needsUpdate = true;
