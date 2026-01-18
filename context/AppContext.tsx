@@ -13,12 +13,13 @@ interface AppContextType {
   addChild: (child: Omit<Child, 'parentId'>) => void;
   deleteChild: (childId: string) => void;
   addTransaction: (transaction: Omit<Transaction, 'userId'>) => void;
-  submitPayment: (childId: string, amount: number) => void;
+  submitPayment: (childId: string, amount: number, receiptUrl?: string) => void;
   addSchool: (school: School) => void;
   updateSchool: (school: School) => void;
   deleteSchool: (schoolId: string) => void;
   deleteAllSchools: () => void;
   deleteUser: (userId: string) => void;
+  updateUser: (user: User) => void;
   sendBroadcast: (title: string, message: string) => void;
   approvePayment: (transactionId: string) => void;
   declinePayment: (transactionId: string) => void;
@@ -93,31 +94,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const childrenData = useMemo(() => {
     if (userRole === 'owner' && !actingUserId) return allChildren;
-    
     const targetUserId = actingUserId || currentUser?.id;
-
     if (userRole === 'school_owner') {
       const sId = activeSchoolId || currentUser?.schoolId;
       if (!sId) return [];
       const school = schools.find(s => s.id === sId);
       return allChildren.filter(c => c.school === school?.name);
     }
-    
     return allChildren.filter(c => c.parentId === targetUserId);
   }, [allChildren, currentUser, userRole, schools, activeSchoolId, actingUserId]);
 
   const transactions = useMemo(() => {
     if (userRole === 'owner' && !actingUserId) return allTransactions;
-
     const targetUserId = actingUserId || currentUser?.id;
-
     if (userRole === 'school_owner') {
       const sId = activeSchoolId || currentUser?.schoolId;
       if (!sId) return [];
       const school = schools.find(s => s.id === sId);
       return allTransactions.filter(t => t.schoolName === school?.name);
     }
-
     return allTransactions.filter(t => t.userId === targetUserId);
   }, [allTransactions, currentUser, userRole, schools, activeSchoolId, actingUserId]);
 
@@ -184,7 +179,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setActingRole = (role: 'parent' | 'owner' | 'school_owner' | 'university_student', schoolId?: string, userId?: string) => {
       if (currentUser?.role !== 'owner') return; 
-      
       setUserRole(role);
       setActiveSchoolId(schoolId || null);
       setActingUserId(userId || null);
@@ -220,6 +214,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAllChildren(API.children.list());
     setAllTransactions(API.transactions.list());
     setAllNotifications(API.notifications.list());
+  };
+
+  const updateUser = (user: User) => {
+      const updated = API.users.update(user);
+      setAllUsers(updated);
+      if (currentUser?.id === user.id) {
+          setCurrentUser(user);
+      }
   };
 
   const addChild = (child: Omit<Child, 'parentId'>) => {
@@ -277,6 +279,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             paidAmount: Math.min(newPaid, c.totalFee),
             status: isComplete ? 'Completed' : ('On Track' as any),
             nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount,
+            nextDueDate: isComplete ? '-' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           };
         }
         return c;
@@ -294,9 +297,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAllTransactions(updatedTx);
   };
 
-  const submitPayment = (childId: string, amount: number) => {
+  const submitPayment = (childId: string, amount: number, receiptUrl?: string) => {
     const child = allChildren.find((c) => c.id === childId);
     if (!child) return;
+
+    const isActivation = child.paidAmount === 0;
 
     const newTrans: Transaction = {
         id: Date.now().toString(),
@@ -306,38 +311,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         schoolName: child.school,
         amount: amount,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: 'Successful'
+        status: isActivation ? 'Pending' : 'Successful',
+        receiptUrl: receiptUrl || 'https://images.unsplash.com/photo-1554224155-169641357599?auto=format&fit=crop&q=80&w=400'
     };
 
     const updatedTx = API.transactions.add(newTrans);
     setAllTransactions(updatedTx);
 
-    const updatedChildren = allChildren.map(c => {
-        if (c.id === childId) {
-            const newPaid = c.paidAmount + amount;
-            const isComplete = newPaid >= c.totalFee;
-            return {
-                ...c,
-                paidAmount: Math.min(newPaid, c.totalFee),
-                status: isComplete ? 'Completed' : 'On Track' as any,
-                nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount
-            };
-        }
-        return c;
-    });
-    
-    API.children.updateAll(updatedChildren);
-    setAllChildren(updatedChildren);
+    if (!isActivation) {
+        const updatedChildren = allChildren.map(c => {
+            if (c.id === childId) {
+                const newPaid = c.paidAmount + amount;
+                const isComplete = newPaid >= c.totalFee;
+                return {
+                    ...c,
+                    paidAmount: Math.min(newPaid, c.totalFee),
+                    status: isComplete ? 'Completed' : 'On Track' as any,
+                    nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount,
+                    nextDueDate: isComplete ? '-' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                };
+            }
+            return c;
+        });
+        API.children.updateAll(updatedChildren);
+        setAllChildren(updatedChildren);
+    }
 
     const newNotif: Notification = {
         id: Date.now().toString(),
         userId: child.parentId,
         type: 'payment',
-        title: 'Payment Successful',
-        message: `₦${amount.toLocaleString()} has been recorded for ${child.name}.`,
+        title: isActivation ? 'Payment Pending Verification' : 'Payment Successful',
+        message: isActivation 
+            ? `Your activation deposit for ${child.name} is being reviewed.`
+            : `₦${amount.toLocaleString()} has been recorded for ${child.name}.`,
         timestamp: 'Just now',
         read: false,
-        status: 'success'
+        status: isActivation ? 'warning' : 'success'
     };
     const updatedNotifs = API.notifications.add(newNotif);
     setAllNotifications(updatedNotifs);
@@ -360,6 +370,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteSchool,
         deleteAllSchools,
         deleteUser,
+        updateUser,
         sendBroadcast,
         approvePayment,
         declinePayment,

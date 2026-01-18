@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Header } from '../components/Header';
@@ -7,12 +7,19 @@ import { BottomNav } from '../components/BottomNav';
 import { useApp } from '../context/AppContext';
 
 const ProfileScreen: React.FC = () => {
-    const { logout, userRole, isOwnerAccount, switchRole, effectiveUser, actingUserId, setActingRole, schools } = useApp();
+    const { logout, userRole, isOwnerAccount, switchRole, effectiveUser, actingUserId, setActingRole, schools, updateUser } = useApp();
     const navigate = useNavigate();
     
     const isImpersonating = !!actingUserId;
-    const isStudent = userRole === 'university_student';
     const isSchoolOwner = userRole === 'school_owner';
+
+    // Edit state for bank details
+    const [isEditingBank, setIsEditingBank] = useState(false);
+    const [editBankData, setEditBankData] = useState({
+        bankName: effectiveUser?.bankName || '',
+        accountName: effectiveUser?.accountName || '',
+        accountNumber: effectiveUser?.accountNumber || ''
+    });
 
     const userSchool = useMemo(() => {
         if (!effectiveUser?.schoolId) return null;
@@ -21,7 +28,6 @@ const ProfileScreen: React.FC = () => {
 
     const handleSwitch = () => {
         if (switchRole) switchRole();
-        // Redirect to appropriate dashboard after switching
         if (userRole === 'owner') {
             navigate('/dashboard');
         } else {
@@ -34,6 +40,19 @@ const ProfileScreen: React.FC = () => {
         navigate('/owner-dashboard');
     };
 
+    const handleSaveBank = () => {
+        if (!effectiveUser) return;
+        
+        const updatedUser = {
+            ...effectiveUser,
+            ...editBankData
+        };
+        
+        updateUser(updatedUser);
+        setIsEditingBank(false);
+        alert('Settlement details updated successfully!');
+    };
+
     const getRoleLabel = () => {
         switch(effectiveUser?.role) {
             case 'owner': return 'Platform Admin';
@@ -41,6 +60,11 @@ const ProfileScreen: React.FC = () => {
             case 'university_student': return 'University Student';
             default: return 'Parent Account';
         }
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        alert('Account number copied!');
     };
 
   return (
@@ -114,6 +138,108 @@ const ProfileScreen: React.FC = () => {
                         </div>
                     </div>
                 </section>
+            )}
+
+            {/* Direct Settlement Account (School Owners Only) */}
+            {isSchoolOwner && (
+                 <section className="animate-fade-in">
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <h3 className="text-[10px] font-black text-text-secondary-light uppercase tracking-[0.2em]">Bursary Settlement Account</h3>
+                        {!isEditingBank && (
+                             <button 
+                                onClick={() => setIsEditingBank(true)}
+                                className="flex items-center gap-1 text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-3 py-1.5 rounded-lg"
+                             >
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                                Update
+                             </button>
+                        )}
+                    </div>
+                    
+                    {isEditingBank ? (
+                         <div className="p-6 bg-white dark:bg-card-dark rounded-[32px] border-2 border-primary/30 shadow-xl space-y-4 animate-scale-in">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-text-secondary-light uppercase tracking-widest mb-1 block">Bank Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={editBankData.bankName}
+                                        onChange={e => setEditBankData({...editBankData, bankName: e.target.value})}
+                                        className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm font-bold"
+                                        placeholder="e.g. Access Bank"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-text-secondary-light uppercase tracking-widest mb-1 block">Account Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={editBankData.accountName}
+                                        onChange={e => setEditBankData({...editBankData, accountName: e.target.value})}
+                                        className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm font-bold"
+                                        placeholder="Full legal account name"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-text-secondary-light uppercase tracking-widest mb-1 block">Account Number</label>
+                                    <input 
+                                        type="text" 
+                                        maxLength={10}
+                                        value={editBankData.accountNumber}
+                                        onChange={e => setEditBankData({...editBankData, accountNumber: e.target.value.replace(/\D/g, '')})}
+                                        className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm font-bold tracking-widest"
+                                        placeholder="10 digit account number"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button 
+                                    onClick={() => setIsEditingBank(false)}
+                                    className="flex-1 h-12 rounded-xl bg-gray-100 dark:bg-white/10 text-text-secondary-light text-xs font-black uppercase"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleSaveBank}
+                                    className="flex-1 h-12 rounded-xl bg-primary text-white text-xs font-black uppercase shadow-lg shadow-primary/20"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                         </div>
+                    ) : (
+                        <div className="p-6 bg-slate-900 text-white rounded-[32px] border border-white/10 shadow-xl space-y-4">
+                            <div className="flex justify-between items-start">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase">Bank Name</span>
+                                    <span className="text-sm font-bold">{effectiveUser?.bankName || 'Not Set'}</span>
+                                </div>
+                                <div className="text-right flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase">Account Type</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-accent">Direct Installments</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold text-slate-500 uppercase">Account Name</span>
+                                <span className="text-sm font-bold truncate">{effectiveUser?.accountName || 'Not Set'}</span>
+                            </div>
+                            <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                                 <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase">Account Number</span>
+                                    <span className="text-2xl font-mono font-black tracking-widest text-primary">{effectiveUser?.accountNumber || '0000000000'}</span>
+                                </div>
+                                <button 
+                                    onClick={() => copyToClipboard(effectiveUser?.accountNumber || '')}
+                                    className="size-10 bg-white/10 rounded-xl flex items-center justify-center hover:bg-white/20 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-sm">content_copy</span>
+                                </button>
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-500 text-center uppercase tracking-widest leading-relaxed">
+                                This account is visible to parents for all direct installment payments.
+                            </p>
+                        </div>
+                    )}
+                 </section>
             )}
 
             {/* Menu Sections */}

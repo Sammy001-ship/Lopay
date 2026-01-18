@@ -36,59 +36,86 @@ export const API = {
         let users = get<User[]>(KEYS.USERS) || [];
         const adminEmail = 'admin@lopay.app';
         const demoEmail = 'demo@lopay.app';
-        const schoolOwnerEmail = 'owner@febison.com';
+        const febisonEmail = 'owner@febison.com';
+        const westhillsEmail = 'bursar@westhills.edu.ng';
+        const inglewoodEmail = 'accounts@inglewood.edu.ng';
 
-        let adminExists = false;
-        let demoExists = false;
-        let schoolOwnerExists = false;
+        const existingEmails = new Set(users.map(u => u.email.toLowerCase()));
         let needsUpdate = false;
 
-        users = users.map(u => {
-            if (u.email.toLowerCase() === adminEmail) adminExists = true;
-            if (u.email.toLowerCase() === demoEmail) demoExists = true;
-            if (u.email.toLowerCase() === schoolOwnerEmail) schoolOwnerExists = true;
-            return u;
+        const addIfMissing = (user: User) => {
+            const existingIdx = users.findIndex(u => u.email.toLowerCase() === user.email.toLowerCase());
+            if (existingIdx === -1) {
+                users.push(user);
+                needsUpdate = true;
+            } else {
+                // If it's a demo account, we check if details have changed to keep demo data fresh
+                // But we don't overwrite if the user has manually changed them via Profile screen (which updates the DB)
+                // For this specific request, we will ensure the new details are applied if the current ones match old defaults
+                const current = users[existingIdx];
+                if (current.id === user.id && (current.accountNumber !== user.accountNumber || current.bankName !== user.bankName)) {
+                    users[existingIdx] = { ...current, ...user };
+                    needsUpdate = true;
+                }
+            }
+        };
+
+        addIfMissing({
+            id: 'admin-1',
+            name: 'System Admin',
+            email: adminEmail,
+            password: 'admin',
+            role: 'owner',
+            createdAt: new Date().toISOString()
         });
 
-        if (!adminExists) {
-            users.push({
-                id: 'admin-1',
-                name: 'System Admin',
-                email: adminEmail,
-                password: 'admin',
-                role: 'owner',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: DEMO_USER_ID,
+            name: 'Demo Parent',
+            email: demoEmail,
+            password: 'demo',
+            role: 'parent',
+            createdAt: new Date().toISOString()
+        });
 
-        if (!demoExists) {
-            users.push({
-                id: DEMO_USER_ID,
-                name: 'Demo Parent',
-                email: demoEmail,
-                password: 'demo',
-                role: 'parent',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: 'school-owner-1',
+            name: 'Febison Bursar',
+            email: febisonEmail,
+            password: 'owner',
+            role: 'school_owner',
+            schoolId: 'sch_febison',
+            bankName: 'Moniepoint',
+            accountName: 'Febison Montessori School',
+            accountNumber: '9090390581',
+            createdAt: new Date().toISOString()
+        });
 
-        if (!schoolOwnerExists) {
-            users.push({
-                id: 'school-owner-1',
-                name: 'Febison Bursar',
-                email: schoolOwnerEmail,
-                password: 'owner',
-                role: 'school_owner',
-                schoolId: 'sch_febison',
-                bankName: 'Opay',
-                accountName: 'Febison Montessori Groomers',
-                accountNumber: '8101234567',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: 'school-owner-2',
+            name: 'Okafor Nonso',
+            email: westhillsEmail,
+            password: 'bursar',
+            role: 'school_owner',
+            schoolId: 'sch_westhills',
+            bankName: 'Access Bank',
+            accountName: 'Okafor Nonso',
+            accountNumber: '1101010101',
+            createdAt: new Date().toISOString()
+        });
+
+        addIfMissing({
+            id: 'school-owner-3',
+            name: 'Inglewood school',
+            email: inglewoodEmail,
+            password: 'finance',
+            role: 'school_owner',
+            schoolId: 'sch_inglewood',
+            bankName: 'UBA',
+            accountName: 'Inglewood school',
+            accountNumber: '8130311200',
+            createdAt: new Date().toISOString()
+        });
         
         if (needsUpdate || !get(KEYS.USERS)) {
             set(KEYS.USERS, users);
@@ -156,6 +183,12 @@ export const API = {
       set(KEYS.USERS, updated);
       return updated;
     },
+    update: (user: User) => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      const updated = users.map(u => u.id === user.id ? user : u);
+      set(KEYS.USERS, updated);
+      return updated;
+    },
     delete: (id: string) => {
       const users = get<User[]>(KEYS.USERS) || [];
       const updatedUsers = users.filter(u => u.id !== id);
@@ -195,10 +228,10 @@ export const API = {
       if (schoolToDelete) {
           const schoolName = schoolToDelete.name;
           const children = get<Child[]>(KEYS.CHILDREN) || [];
-          const updatedChildren = children.filter(c => c.school !== schoolName);
+          const updatedChildren = children.filter(c => c.school === schoolName);
           set(KEYS.CHILDREN, updatedChildren);
           const transactions = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
-          const updatedTransactions = transactions.filter(t => t.schoolName !== schoolName);
+          const updatedTransactions = transactions.filter(t => t.schoolName === schoolName);
           set(KEYS.TRANSACTIONS, updatedTransactions);
       }
       return updatedSchools;

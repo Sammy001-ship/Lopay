@@ -12,7 +12,6 @@ const Dashboard: React.FC = () => {
   const isStudent = userRole === 'university_student';
   const entityType = isStudent ? "Institution" : "School";
 
-  // If acting as someone, find who they are for the banner
   const actingAs = actingUserId ? allUsers.find(u => u.id === actingUserId) : null;
 
   const totalNextDue = childrenData.reduce((acc, child) => {
@@ -49,7 +48,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <Layout showBottomNav>
-      {/* Impersonation Banner */}
       {actingUserId && isOwnerAccount && (
         <div className="bg-purple-600 text-white px-6 py-2.5 flex items-center justify-between shadow-lg sticky top-0 z-50">
            <div className="flex items-center gap-2">
