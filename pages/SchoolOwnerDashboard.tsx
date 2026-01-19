@@ -34,11 +34,15 @@ const SchoolOwnerDashboard: React.FC = () => {
     return schoolStudents.filter(s => s.grade === selectedClass);
   }, [schoolStudents, selectedClass]);
 
+  const schoolTransactions = useMemo(() => {
+      return transactions.filter(t => t.schoolName === mySchool?.name);
+  }, [transactions, mySchool]);
+
   const totalRevenue = useMemo(() => {
-    return transactions
+    return schoolTransactions
       .filter(t => t.status === 'Successful')
       .reduce((acc, t) => acc + t.amount, 0);
-  }, [transactions]);
+  }, [schoolTransactions]);
 
   const totalOutstanding = useMemo(() => {
       return schoolStudents.reduce((acc, c) => acc + (c.totalFee - c.paidAmount), 0);
@@ -283,6 +287,50 @@ const SchoolOwnerDashboard: React.FC = () => {
                             </div>
                         );
                     })
+                )}
+            </div>
+        </div>
+
+        {/* Recent Transactions Log */}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+                <h3 className="text-xs font-black text-text-primary-light dark:text-text-primary-dark uppercase tracking-[0.15em] flex items-center gap-2">
+                    <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                        <span className="material-symbols-outlined text-base filled">history</span>
+                    </div>
+                    Recent Payments Log
+                </h3>
+                <button 
+                    onClick={() => navigate('/history')}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest"
+                >
+                    View All
+                </button>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+                {schoolTransactions.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50/30 dark:bg-white/5 rounded-2xl border border-dashed border-gray-100 dark:border-gray-800">
+                        <p className="text-[10px] text-text-secondary-light font-bold uppercase tracking-widest">No transactions recorded</p>
+                    </div>
+                ) : (
+                    schoolTransactions.slice(0, 5).map(tx => (
+                        <div key={tx.id} className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex justify-between items-center transition-all hover:border-primary/20">
+                            <div className="flex items-center gap-3">
+                                <div className={`size-10 rounded-xl flex items-center justify-center text-white ${tx.status === 'Successful' ? 'bg-success shadow-lg shadow-success/20' : 'bg-warning shadow-lg shadow-warning/20'}`}>
+                                    <span className="material-symbols-outlined text-xl">{tx.status === 'Successful' ? 'check' : 'sync'}</span>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-text-primary-light dark:text-text-primary-dark">{tx.childName}</p>
+                                    <p className="text-[9px] text-text-secondary-light font-bold uppercase tracking-widest">{tx.date}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm font-black text-text-primary-light dark:text-text-primary-dark">₦{tx.amount.toLocaleString()}</p>
+                                <p className={`text-[8px] font-black uppercase tracking-[0.15em] ${tx.status === 'Successful' ? 'text-success' : 'text-warning'}`}>{tx.status}</p>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>

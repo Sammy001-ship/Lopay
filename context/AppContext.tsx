@@ -119,8 +119,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const notifications = useMemo(() => {
     if (userRole === 'owner' && !actingUserId) return allNotifications;
     const targetUserId = actingUserId || currentUser?.id;
+    if (userRole === 'school_owner') {
+        const sId = activeSchoolId || currentUser?.schoolId;
+        return allNotifications.filter(n => n.userId === targetUserId || !n.userId || (n.userId === currentUser?.id));
+    }
     return allNotifications.filter(n => n.userId === targetUserId || !n.userId);
-  }, [allNotifications, currentUser, userRole, actingUserId]);
+  }, [allNotifications, currentUser, userRole, actingUserId, activeSchoolId]);
 
   const login = (email: string, password?: string) => {
     const user = API.auth.login(email, password);
@@ -337,8 +341,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setAllChildren(updatedChildren);
     }
 
-    const newNotif: Notification = {
-        id: Date.now().toString(),
+    // Notify Parent
+    const newNotifParent: Notification = {
+        id: Date.now().toString() + '-p',
         userId: child.parentId,
         type: 'payment',
         title: isActivation ? 'Payment Pending Verification' : 'Payment Successful',
@@ -349,8 +354,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         read: false,
         status: isActivation ? 'warning' : 'success'
     };
-    const updatedNotifs = API.notifications.add(newNotif);
-    setAllNotifications(updatedNotifs);
+    API.notifications.add(newNotifParent);
+
+    // Notify School Owner
+    const schoolObj = schools.find(s => s.name === child.school);
+    const bursar = allUsers.find(u => u.role === 'school_owner' && u.schoolId === schoolObj?.id);
+    if (bursar) {
+        const newNotifBursar: Notification = {
+            id: Date.now().toString() + '-b',
+            userId: bursar.id,
+            type: 'payment',
+            title: isActivation ? 'New Activation Received' : 'Installment Received',
+            message: `₦${amount.toLocaleString()} received for ${child.name} (${child.grade}).`,
+            timestamp: 'Just now',
+            read: false,
+            status: 'info'
+        };
+        API.notifications.add(newNotifBursar);
+    }
+
+    setAllNotifications(API.notifications.list());
   };
 
   return (
