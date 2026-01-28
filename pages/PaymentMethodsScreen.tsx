@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Header } from '../components/Header';
@@ -12,13 +12,16 @@ const PaymentMethodsScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
-  const state = location.state as { paymentType?: string, amount?: number, childId?: string } | null;
+  const state = location.state as { paymentType?: string, amount?: number, childId?: string, allowCustom?: boolean, isCustomOnly?: boolean } | null;
   const isPaymentFlow = state?.paymentType === 'installment';
   const isStudent = userRole === 'university_student';
 
   const child = useMemo(() => {
     return childrenData.find(c => c.id === state?.childId);
   }, [childrenData, state?.childId]);
+
+  const [paymentAmount, setPaymentAmount] = useState(state?.amount || 0);
+  const [isEditingAmount, setIsEditingAmount] = useState(!!state?.isCustomOnly);
 
   const school = useMemo(() => {
     return schools.find(s => s.name === child?.school);
@@ -53,6 +56,8 @@ const PaymentMethodsScreen: React.FC = () => {
     };
   }, [child, institutionBank, isStudent]);
 
+  const canEditAmount = !activeBankDetails.isLopayEscrow && state?.allowCustom;
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("Account number copied!");
@@ -63,12 +68,14 @@ const PaymentMethodsScreen: React.FC = () => {
   };
 
   const handlePaymentSent = () => {
-      if (state?.childId && state?.amount) {
+      if (state?.childId && paymentAmount > 0) {
           setIsProcessing(true);
           setTimeout(() => {
-              submitPayment(state.childId!, state.amount!, receiptImage || undefined);
+              submitPayment(state.childId!, paymentAmount, receiptImage || undefined);
               navigate('/dashboard');
           }, 1500);
+      } else {
+          alert("Please enter a valid amount.");
       }
   };
 
@@ -100,10 +107,48 @@ const PaymentMethodsScreen: React.FC = () => {
                           {activeBankDetails.isLopayEscrow ? "Phase 1: Activation" : `Phase 2: Direct Payment`}
                       </span>
                   </div>
-                  <p className="text-text-secondary-light dark:text-text-secondary-dark text-[10px] font-bold uppercase tracking-widest mb-1">Transfer Amount</p>
-                  <p className={`text-4xl font-black tracking-tight ${activeBankDetails.isLopayEscrow ? 'text-primary' : 'text-success'}`}>
-                      ₦{state.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </p>
+                  
+                  <div className="flex flex-col items-center">
+                    <p className="text-text-secondary-light dark:text-text-secondary-dark text-[10px] font-bold uppercase tracking-widest mb-1">Transfer Amount</p>
+                    
+                    {isEditingAmount && canEditAmount ? (
+                        <div className="relative w-full max-w-[200px] flex items-center justify-center">
+                            <span className="text-2xl font-black text-success mr-1">₦</span>
+                            <input 
+                                type="number"
+                                autoFocus
+                                value={paymentAmount || ''}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    const remaining = (child?.totalFee || 0) - (child?.paidAmount || 0);
+                                    setPaymentAmount(Math.min(val, remaining));
+                                }}
+                                className="w-full bg-transparent border-none text-center text-4xl font-black text-success p-0 outline-none"
+                                placeholder="0.00"
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <p className={`text-4xl font-black tracking-tight ${activeBankDetails.isLopayEscrow ? 'text-primary' : 'text-success'}`}>
+                                ₦{paymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                            {canEditAmount && (
+                                <button 
+                                    onClick={() => setIsEditingAmount(true)}
+                                    className="size-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-text-secondary-light hover:text-success transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    
+                    {!activeBankDetails.isLopayEscrow && child && (
+                        <p className="text-[9px] font-bold text-text-secondary-light mt-1 uppercase">
+                            Outstanding Balance: ₦{(child.totalFee - child.paidAmount).toLocaleString()}
+                        </p>
+                    )}
+                  </div>
               </div>
           )}
 
@@ -159,7 +204,7 @@ const PaymentMethodsScreen: React.FC = () => {
           <div className="mt-auto pt-4">
               <button 
                 onClick={handlePaymentSent}
-                disabled={isProcessing}
+                disabled={isProcessing || paymentAmount <= 0}
                 className={`w-full h-16 text-white rounded-2xl font-black text-base uppercase tracking-widest shadow-xl disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center transition-all active:scale-95 ${activeBankDetails.isLopayEscrow ? 'bg-primary shadow-primary/20' : 'bg-success shadow-success/20'}`}
               >
                   {isProcessing ? (

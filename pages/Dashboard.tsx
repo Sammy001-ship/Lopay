@@ -24,7 +24,8 @@ const Dashboard: React.FC = () => {
         state: {
             paymentType: 'installment',
             amount: amount,
-            childId: childId
+            childId: childId,
+            allowCustom: true
         }
     });
   };
@@ -227,22 +228,33 @@ const Dashboard: React.FC = () => {
                                             </span>
                                         </p>
                                     </div>
-                                    <button 
-                                        onClick={() => handleQuickPay(child.id, child.nextInstallmentAmount)}
-                                        className={`${child.paidAmount === 0 ? 'bg-primary' : 'bg-success'} text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-primary/20 active:scale-95 transition-all hover:opacity-90 flex items-center gap-2`}
-                                    >
-                                        {child.paidAmount === 0 ? (
-                                            <>
-                                                <span className="material-symbols-outlined text-sm">lock_open</span>
-                                                Pay Activation
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined text-sm">account_balance</span>
-                                                Pay {entityType}
-                                            </>
+                                    <div className="flex items-center gap-2">
+                                        {child.paidAmount > 0 && (
+                                            <button 
+                                                onClick={() => navigate('/payment-methods', { state: { paymentType: 'installment', amount: 0, childId: child.id, allowCustom: true, isCustomOnly: true } })}
+                                                className="bg-white dark:bg-card-dark border-2 border-gray-200 dark:border-gray-700 text-text-primary-light dark:text-text-primary-dark size-11 flex items-center justify-center rounded-xl text-xs font-bold active:scale-95 transition-all hover:bg-gray-100 dark:hover:bg-white/10"
+                                                title="Pay Custom Amount"
+                                            >
+                                                <span className="material-symbols-outlined text-xl">payments</span>
+                                            </button>
                                         )}
-                                    </button>
+                                        <button 
+                                            onClick={() => handleQuickPay(child.id, child.nextInstallmentAmount)}
+                                            className={`${child.paidAmount === 0 ? 'bg-primary' : 'bg-success'} text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-primary/20 active:scale-95 transition-all hover:opacity-90 flex items-center gap-2`}
+                                        >
+                                            {child.paidAmount === 0 ? (
+                                                <>
+                                                    <span className="material-symbols-outlined text-sm">lock_open</span>
+                                                    Pay Activation
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-sm">account_balance</span>
+                                                    Pay {entityType}
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </>
                             )}
                         </div>
