@@ -36,56 +36,83 @@ export const API = {
         let users = get<User[]>(KEYS.USERS) || [];
         const adminEmail = 'admin@lopay.app';
         const demoEmail = 'demo@lopay.app';
-        const schoolOwnerEmail = 'owner@febison.com';
+        const febisonEmail = 'owner@febison.com';
+        const westhillsEmail = 'bursar@westhills.edu.ng';
+        const inglewoodEmail = 'accounts@inglewood.edu.ng';
 
-        let adminExists = false;
-        let demoExists = false;
-        let schoolOwnerExists = false;
+        const existingEmails = new Set(users.map(u => u.email.toLowerCase()));
         let needsUpdate = false;
 
-        users = users.map(u => {
-            if (u.email.toLowerCase() === adminEmail) adminExists = true;
-            if (u.email.toLowerCase() === demoEmail) demoExists = true;
-            if (u.email.toLowerCase() === schoolOwnerEmail) schoolOwnerExists = true;
-            return u;
+        const addIfMissing = (user: User) => {
+            const existingIdx = users.findIndex(u => u.email.toLowerCase() === user.email.toLowerCase());
+            if (existingIdx === -1) {
+                users.push(user);
+                needsUpdate = true;
+            } else {
+                const current = users[existingIdx];
+                if (current.id === user.id && (current.accountNumber !== user.accountNumber || current.bankName !== user.bankName)) {
+                    users[existingIdx] = { ...current, ...user };
+                    needsUpdate = true;
+                }
+            }
+        };
+
+        addIfMissing({
+            id: 'admin-1',
+            name: 'System Admin',
+            email: adminEmail,
+            password: 'admin',
+            role: 'owner',
+            createdAt: new Date().toISOString()
         });
 
-        if (!adminExists) {
-            users.push({
-                id: 'admin-1',
-                name: 'System Admin',
-                email: adminEmail,
-                password: 'admin',
-                role: 'owner',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: DEMO_USER_ID,
+            name: 'Demo Parent',
+            email: demoEmail,
+            password: 'demo',
+            role: 'parent',
+            createdAt: new Date().toISOString()
+        });
 
-        if (!demoExists) {
-            users.push({
-                id: DEMO_USER_ID,
-                name: 'Demo Parent',
-                email: demoEmail,
-                password: 'demo',
-                role: 'parent',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: 'school-owner-1',
+            name: 'Febison Bursar',
+            email: febisonEmail,
+            password: 'owner',
+            role: 'school_owner',
+            schoolId: 'sch_febison',
+            bankName: 'Moniepoint',
+            accountName: 'Febison Montessori School',
+            accountNumber: '9090390581',
+            createdAt: new Date().toISOString()
+        });
 
-        if (!schoolOwnerExists) {
-            users.push({
-                id: 'school-owner-1',
-                name: 'Febison Bursar',
-                email: schoolOwnerEmail,
-                password: 'owner',
-                role: 'school_owner',
-                schoolId: 'sch_febison',
-                createdAt: new Date().toISOString()
-            });
-            needsUpdate = true;
-        }
+        addIfMissing({
+            id: 'school-owner-2',
+            name: 'Okafor Nonso',
+            email: westhillsEmail,
+            password: 'bursar',
+            role: 'school_owner',
+            schoolId: 'sch_westhills',
+            bankName: 'Access Bank',
+            accountName: 'Okafor Nonso',
+            accountNumber: '1101010101',
+            createdAt: new Date().toISOString()
+        });
+
+        addIfMissing({
+            id: 'school-owner-3',
+            name: 'Inglewood school',
+            email: inglewoodEmail,
+            password: 'finance',
+            role: 'school_owner',
+            schoolId: 'sch_inglewood',
+            bankName: 'UBA',
+            accountName: 'Inglewood school',
+            accountNumber: '8130311200',
+            createdAt: new Date().toISOString()
+        });
         
         if (needsUpdate || !get(KEYS.USERS)) {
             set(KEYS.USERS, users);
@@ -99,21 +126,39 @@ export const API = {
                     name: 'Febison Montessori Groomers School',
                     address: '106, C.A.C Agbeye Junction, Eyita, Ikorodu, Lagos',
                     contactEmail: 'info@febison.edu.ng',
-                    studentCount: 45
+                    studentCount: 45,
+                    feeStructure: {
+                        'Basic 1': 120000,
+                        'Basic 2': 120000,
+                        'Basic 3': 125000,
+                        'Basic 4': 130000,
+                        'JSS1': 180000,
+                        'SS1': 220000
+                    }
                 },
                 {
                     id: 'sch_westhills',
                     name: 'Westhills School',
                     address: 'Westhills avenue, Eyita, Ikorodu, Lagos',
                     contactEmail: 'admin@westhills.edu.ng',
-                    studentCount: 30
+                    studentCount: 30,
+                    feeStructure: {
+                        'Reception 1': 85000,
+                        'Nursery 1': 90000,
+                        'Basic 1': 110000
+                    }
                 },
                 {
                     id: 'sch_inglewood',
                     name: 'Inglewood School',
                     address: 'Oshewa street, Ori-Okuta, Ikorodu, Lagos',
                     contactEmail: 'contact@inglewood.edu.ng',
-                    studentCount: 22
+                    studentCount: 22,
+                    feeStructure: {
+                        'JSS1': 150000,
+                        'JSS2': 155000,
+                        'JSS3': 160000
+                    }
                 }
             ];
             set(KEYS.SCHOOLS, defaultSchools);
@@ -150,6 +195,12 @@ export const API = {
     create: (user: User) => {
       const users = get<User[]>(KEYS.USERS) || [];
       const updated = [...users, user];
+      set(KEYS.USERS, updated);
+      return updated;
+    },
+    update: (user: User) => {
+      const users = get<User[]>(KEYS.USERS) || [];
+      const updated = users.map(u => u.id === user.id ? user : u);
       set(KEYS.USERS, updated);
       return updated;
     },
@@ -192,10 +243,10 @@ export const API = {
       if (schoolToDelete) {
           const schoolName = schoolToDelete.name;
           const children = get<Child[]>(KEYS.CHILDREN) || [];
-          const updatedChildren = children.filter(c => c.school !== schoolName);
+          const updatedChildren = children.filter(c => c.school === schoolName);
           set(KEYS.CHILDREN, updatedChildren);
           const transactions = get<Transaction[]>(KEYS.TRANSACTIONS) || [];
-          const updatedTransactions = transactions.filter(t => t.schoolName !== schoolName);
+          const updatedTransactions = transactions.filter(t => t.schoolName === schoolName);
           set(KEYS.TRANSACTIONS, updatedTransactions);
       }
       return updatedSchools;

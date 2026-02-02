@@ -15,18 +15,16 @@ const SchoolOwnerDashboard: React.FC = () => {
 
   const CLASS_GROUPS = [
     { label: 'Early Years', classes: ['Reception 1', 'Reception 2', 'Nursery 1', 'Nursery 2'] },
-    { label: 'Primary', classes: ['Basic 1', 'Basic 2', 'Basic 3', 'Basic 4', 'Basic 5', 'Basic 6'] },
-    { label: 'Junior Sec', classes: ['JSS 1', 'JSS 2', 'JSS 3'] },
-    { label: 'Senior Sec', classes: ['SS 1', 'SS 2', 'SS 3'] },
+    { label: 'Primary', classes: ['Basic 1', 'Basic 2', 'Basic 3', 'Basic 4', 'Basic 5'] },
+    { label: 'Junior Sec', classes: ['JSS1', 'JSS2', 'JSS3'] },
+    { label: 'Senior Sec', classes: ['SS1', 'SS2', 'SS3'] },
   ];
 
-  // Find the designated school for this owner
   const mySchool = useMemo(() => {
     const sId = activeSchoolId || currentUser?.schoolId;
     return schools.find(s => s.id === sId);
   }, [schools, currentUser, activeSchoolId]);
 
-  // Calculations scoped to this school only
   const schoolStudents = useMemo(() => {
     return childrenData.filter(c => c.school === mySchool?.name);
   }, [childrenData, mySchool]);
@@ -36,11 +34,15 @@ const SchoolOwnerDashboard: React.FC = () => {
     return schoolStudents.filter(s => s.grade === selectedClass);
   }, [schoolStudents, selectedClass]);
 
+  const schoolTransactions = useMemo(() => {
+      return transactions.filter(t => t.schoolName === mySchool?.name);
+  }, [transactions, mySchool]);
+
   const totalRevenue = useMemo(() => {
-    return transactions
+    return schoolTransactions
       .filter(t => t.status === 'Successful')
       .reduce((acc, t) => acc + t.amount, 0);
-  }, [transactions]);
+  }, [schoolTransactions]);
 
   const totalOutstanding = useMemo(() => {
       return schoolStudents.reduce((acc, c) => acc + (c.totalFee - c.paidAmount), 0);
@@ -67,7 +69,24 @@ const SchoolOwnerDashboard: React.FC = () => {
 
   return (
     <Layout showBottomNav>
-      <div className="sticky top-0 z-10 bg-white dark:bg-background-dark p-6 pb-2 border-b border-gray-100 dark:border-gray-800">
+      {activeSchoolId && isOwnerAccount && (
+        <div className="bg-secondary text-white px-6 py-2.5 flex items-center justify-between shadow-lg sticky top-0 z-50">
+           <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">visibility</span>
+                <p className="text-[10px] font-black uppercase tracking-widest">
+                    Managing {mySchool?.name || 'School'}
+                </p>
+           </div>
+           <button 
+                onClick={handleReturnToAdmin}
+                className="bg-white text-secondary px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-sm active:scale-95"
+           >
+               Exit School
+           </button>
+        </div>
+      )}
+
+      <div className={`sticky top-0 z-10 bg-white dark:bg-background-dark p-6 pb-2 border-b border-gray-100 dark:border-gray-800 ${activeSchoolId && isOwnerAccount ? 'top-[42px]' : ''}`}>
         <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
                 <div className="size-10 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary shadow-sm">
@@ -88,7 +107,6 @@ const SchoolOwnerDashboard: React.FC = () => {
             </button>
         </div>
 
-        {/* Enhanced Sliding Classroom Scroller */}
         <div className="flex flex-col gap-2 relative">
             <div className="flex items-center justify-between px-1">
                 <p className="text-[9px] font-bold text-text-secondary-light uppercase tracking-widest">Select Class to View Ledger</p>
@@ -98,7 +116,6 @@ const SchoolOwnerDashboard: React.FC = () => {
             </div>
             
             <div className="relative">
-                {/* Edge masks for better "sliding" visual */}
                 <div className="absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-white dark:from-background-dark to-transparent z-10 pointer-events-none"></div>
                 <div className="absolute right-0 top-0 bottom-4 w-6 bg-gradient-to-l from-white dark:from-background-dark to-transparent z-10 pointer-events-none"></div>
 
@@ -119,7 +136,6 @@ const SchoolOwnerDashboard: React.FC = () => {
                         
                         {CLASS_GROUPS.map((group) => (
                             <div key={group.label} className="flex gap-2 items-center">
-                                {/* Visual separator group label */}
                                 <div className="h-8 px-2 flex flex-col justify-center border-l-2 border-gray-100 dark:border-gray-800 ml-2">
                                     <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">{group.label}</span>
                                 </div>
@@ -142,7 +158,25 @@ const SchoolOwnerDashboard: React.FC = () => {
       </div>
 
       <main className="flex flex-col gap-6 p-6 pb-32">
-        {/* Statistics Overview */}
+        {/* Management Tools */}
+        <div className="grid grid-cols-2 gap-4">
+             <button 
+                onClick={() => navigate('/admin/manage-fees')}
+                className="col-span-2 flex items-center justify-between p-5 bg-secondary/5 border-2 border-secondary/20 rounded-[28px] hover:bg-secondary/10 transition-all group"
+            >
+                <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-2xl bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/20">
+                        <span className="material-symbols-outlined text-2xl filled">payments</span>
+                    </div>
+                    <div className="text-left">
+                        <p className="text-sm font-black text-secondary uppercase tracking-widest">Fee Structure</p>
+                        <p className="text-[10px] text-secondary/60 font-bold uppercase">Configure Grade Prices</p>
+                    </div>
+                </div>
+                <span className="material-symbols-outlined text-secondary group-hover:translate-x-1 transition-transform">chevron_right</span>
+            </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 bg-slate-900 text-white p-6 rounded-[32px] shadow-2xl relative overflow-hidden group">
                 <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -182,7 +216,6 @@ const SchoolOwnerDashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* Student List Section */}
         <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
                 <h3 className="text-xs font-black text-text-primary-light dark:text-text-primary-dark uppercase tracking-[0.15em] flex items-center gap-2">
@@ -258,7 +291,50 @@ const SchoolOwnerDashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* Improved Report Section */}
+        {/* Recent Transactions Log */}
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+                <h3 className="text-xs font-black text-text-primary-light dark:text-text-primary-dark uppercase tracking-[0.15em] flex items-center gap-2">
+                    <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                        <span className="material-symbols-outlined text-base filled">history</span>
+                    </div>
+                    Recent Payments Log
+                </h3>
+                <button 
+                    onClick={() => navigate('/history')}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest"
+                >
+                    View All
+                </button>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+                {schoolTransactions.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50/30 dark:bg-white/5 rounded-2xl border border-dashed border-gray-100 dark:border-gray-800">
+                        <p className="text-[10px] text-text-secondary-light font-bold uppercase tracking-widest">No transactions recorded</p>
+                    </div>
+                ) : (
+                    schoolTransactions.slice(0, 5).map(tx => (
+                        <div key={tx.id} className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex justify-between items-center transition-all hover:border-primary/20">
+                            <div className="flex items-center gap-3">
+                                <div className={`size-10 rounded-xl flex items-center justify-center text-white ${tx.status === 'Successful' ? 'bg-success shadow-lg shadow-success/20' : 'bg-warning shadow-lg shadow-warning/20'}`}>
+                                    <span className="material-symbols-outlined text-xl">{tx.status === 'Successful' ? 'check' : 'sync'}</span>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-text-primary-light dark:text-text-primary-dark">{tx.childName}</p>
+                                    <p className="text-[9px] text-text-secondary-light font-bold uppercase tracking-widest">{tx.date}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-sm font-black text-text-primary-light dark:text-text-primary-dark">₦{tx.amount.toLocaleString()}</p>
+                                <p className={`text-[8px] font-black uppercase tracking-[0.15em] ${tx.status === 'Successful' ? 'text-success' : 'text-warning'}`}>{tx.status}</p>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+
         <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 space-y-5">
             <div className="flex items-center gap-3">
                 <div className="size-10 rounded-xl bg-white dark:bg-card-dark shadow-xl flex items-center justify-center text-primary">

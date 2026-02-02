@@ -4,6 +4,7 @@ export interface User {
   name: string;
   email: string;
   password?: string;
+  phoneNumber?: string;
   role: 'parent' | 'owner' | 'school_owner' | 'university_student';
   schoolId?: string;
   bankName?: string;
@@ -35,7 +36,6 @@ export interface Transaction {
   amount: number;
   date: string;
   status: 'Successful' | 'Pending' | 'Failed';
-  // Added receiptUrl for verification flow
   receiptUrl?: string;
 }
 
@@ -63,4 +63,5 @@ export interface School {
   address: string;
   contactEmail: string;
   studentCount: number;
+  feeStructure?: Record<string, number>; // Maps grade names to fee amounts
 }
