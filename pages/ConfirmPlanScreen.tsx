@@ -21,6 +21,7 @@ const ConfirmPlanScreen: React.FC = () => {
   const location = useLocation();
   const { addChild, addTransaction, userRole } = useApp();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
   
   const state = location.state as LocationState;
 
@@ -46,12 +47,20 @@ const ConfirmPlanScreen: React.FC = () => {
     alert("Account number copied!");
   };
 
+  const handleSnapReceipt = () => {
+      setReceiptImage('https://images.unsplash.com/photo-1554224155-169641357599?auto=format&fit=crop&q=80&w=400');
+  };
+
   const handleConfirm = () => {
+      if (!receiptImage) {
+          alert("Please upload a payment receipt to proceed.");
+          return;
+      }
       setIsProcessing(true);
       const childId = Date.now().toString();
 
-      setTimeout(() => {
-          addChild({
+      setTimeout(async () => {
+          await addChild({
               id: childId,
               name: childName,
               school: schoolName,
@@ -62,7 +71,7 @@ const ConfirmPlanScreen: React.FC = () => {
               nextDueDate: 'After Activation',
               status: 'On Track',
               avatarUrl: `https://ui-avatars.com/api/?name=${childName.replace(' ','+')}&background=random`
-          });
+          }, receiptImage);
 
           addTransaction({
               id: `tx-activation-${Date.now()}`,
@@ -71,7 +80,8 @@ const ConfirmPlanScreen: React.FC = () => {
               schoolName: schoolName,
               amount: initialActivationPayment,
               date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              status: 'Pending'
+              status: 'Pending',
+              receiptUrl: receiptImage
           });
 
           navigate('/dashboard');
@@ -131,6 +141,28 @@ const ConfirmPlanScreen: React.FC = () => {
                     <p className="mt-4 text-[9px] text-slate-400 leading-relaxed font-medium italic text-center">Transfer the exact amount above to activate your plan.</p>
                 </div>
             </div>
+          </section>
+
+          <section className="mb-6">
+              <h3 className="text-sm font-bold text-text-secondary-light uppercase tracking-wider mb-4 px-1">Proof of Transfer</h3>
+              {receiptImage ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 h-32">
+                      <img src={receiptImage} alt="Receipt" className="w-full h-full object-cover" />
+                      <button onClick={() => setReceiptImage(null)} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1">
+                          <span className="material-symbols-outlined text-xs">close</span>
+                      </button>
+                  </div>
+              ) : (
+                  <button 
+                    onClick={handleSnapReceipt}
+                    className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-text-secondary-light group"
+                  >
+                      <div className="size-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors group-hover:bg-primary group-hover:text-white">
+                          <span className="material-symbols-outlined">photo_camera</span>
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-tight">Upload Payment Receipt</span>
+                  </button>
+              )}
           </section>
 
           <section className="mb-6">

@@ -12,15 +12,13 @@ const AuthScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Bank details for school owners
-  const [bankName, setBankName] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  
   const { login, signup, schools, isAuthenticated, userRole } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,44 +32,46 @@ const AuthScreen: React.FC = () => {
     }
   }, [isAuthenticated, userRole, navigate]);
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
     
     if (mode === 'signup') {
         if (!phoneNumber) {
             setError('Phone number is required for contact updates.');
+            setIsSubmitting(false);
             return;
         }
-        if (roleSelection === 'school_owner') {
-            if (!selectedSchoolId) {
-                setError('Please select the school you own.');
-                return;
-            }
-            if (!bankName || !accountName || !accountNumber) {
-                setError('Please provide complete banking details for settlements.');
-                return;
-            }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match.');
+            setIsSubmitting(false);
+            return;
         }
     }
     
     if (mode === 'login') {
-        const user = login(email, password);
-        if (user) {
-            if (user.role === 'owner') navigate('/owner-dashboard', { replace: true });
-            else if (user.role === 'school_owner') navigate('/school-owner-dashboard', { replace: true });
-            else navigate('/dashboard', { replace: true });
-        } else {
-            setError('Invalid email or password. Please try again.');
+        try {
+            const user = await login(email, password);
+            if (user) {
+                if (user.role === 'owner') navigate('/owner-dashboard', { replace: true });
+                else if (user.role === 'school_owner') navigate('/school-owner-dashboard', { replace: true });
+                else navigate('/dashboard', { replace: true });
+            } else {
+                setError('Invalid email or password. Please try again.');
+                setIsSubmitting(false);
+            }
+        } catch (err) {
+            setError('An error occurred during login.');
+            setIsSubmitting(false);
         }
     } else {
-        const bankDetails = roleSelection === 'school_owner' ? { bankName, accountName, accountNumber } : undefined;
-        const success = signup(fullName, email, phoneNumber, password, roleSelection, selectedSchoolId, bankDetails);
-        if (success) {
-            if (roleSelection === 'school_owner') navigate('/school-owner-dashboard', { replace: true });
-            else navigate('/dashboard', { replace: true });
-        } else {
-            setError('Email already registered.');
+        try {
+            await signup(fullName, email, phoneNumber, password, roleSelection, selectedSchoolId);
+            navigate('/dashboard', { replace: true });
+        } catch (err: any) {
+             setError(err.message || 'An error occurred during sign up.');
+             setIsSubmitting(false);
         }
     }
   };
@@ -90,13 +90,6 @@ const AuthScreen: React.FC = () => {
         desc: 'Paying for my own university tuition', 
         icon: 'school', 
         color: 'bg-purple-500' 
-    },
-    { 
-        id: 'school_owner', 
-        title: 'School Owner', 
-        desc: 'I want to manage fee collections for my institution', 
-        icon: 'account_balance', 
-        color: 'bg-secondary' 
     },
   ] as const;
 
@@ -190,7 +183,7 @@ const AuthScreen: React.FC = () => {
             </div>
           )}
 
-          {mode === 'signup' && (roleSelection === 'school_owner' || roleSelection === 'university_student') && (
+          {mode === 'signup' && roleSelection === 'university_student' && (
             <div className="space-y-1.5 animate-fade-in-up">
               <label className="text-xs font-bold text-text-secondary-light uppercase px-1">Select Institution</label>
               <select 
@@ -205,41 +198,6 @@ const AuthScreen: React.FC = () => {
             </div>
           )}
 
-          {mode === 'signup' && roleSelection === 'school_owner' && (
-             <div className="p-5 bg-secondary/5 rounded-2xl border border-secondary/20 space-y-4 animate-fade-in-up">
-                <p className="text-[10px] font-extrabold text-secondary uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">payments</span>
-                    Settlement Bank Account
-                </p>
-                <div className="space-y-3">
-                    <input
-                        type="text"
-                        required
-                        placeholder="Bank Name (e.g. Opay, Zenith)"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                    <input
-                        type="text"
-                        required
-                        placeholder="Account Number"
-                        maxLength={10}
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                    <input
-                        type="text"
-                        required
-                        placeholder="Full Account Holder Name"
-                        value={accountName}
-                        onChange={(e) => setAccountName(e.target.value)}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                </div>
-             </div>
-          )}
           
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary-light uppercase px-1">Email Address</label>
@@ -290,6 +248,31 @@ const AuthScreen: React.FC = () => {
             </div>
           </div>
 
+          {mode === 'signup' && (
+            <div className="space-y-1.5 animate-fade-in-up">
+              <label className="text-xs font-bold text-text-secondary-light uppercase px-1">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 pr-12 outline-none focus:ring-2 focus:ring-primary/50 text-base"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="p-4 rounded-xl bg-danger/10 text-danger text-sm font-bold text-center animate-bounce">
               {error}
@@ -298,9 +281,10 @@ const AuthScreen: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full h-16 bg-primary text-white rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+            disabled={isSubmitting}
+            className="w-full h-16 bg-primary text-white rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {mode === 'signup' ? 'Create My Account' : 'Sign In to LOPAY'}
+            {isSubmitting ? 'Processing...' : (mode === 'signup' ? 'Create My Account' : 'Sign In to LOPAY')}
           </button>
         </form>
 

@@ -65,3 +65,38 @@ export interface School {
   studentCount: number;
   feeStructure?: Record<string, number>; // Maps grade names to fee amounts
 }
+
+// --- API Response Types ---
+
+export interface LoginResponse {
+  accessToken: string;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
+
+export interface SchoolStats {
+  totalRevenue: number;
+  pendingRevenue: number;
+  totalStudents: number;
+  activeStudents: number;
+}
+
+export interface PendingPayment {
+  id: string;
+  amountPaid: number;
+  studentName: string;
+  date: string;
+  receiptUrl?: string;
+}
+
+export interface EnrolledChild {
+  id: string;
+  childName: string;
+  schoolName: string;
+  className: string;
+  remainingBalance: number;
+  paymentStatus: string;
+}
