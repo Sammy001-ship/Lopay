@@ -6,7 +6,7 @@ import { Layout } from '../components/Layout';
 
 const AuthScreen: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
-  const [roleSelection, setRoleSelection] = useState<'parent' | 'school_owner' | 'university_student'>('parent');
+  const [roleSelection, setRoleSelection] = useState<'parent' | 'university_student'>('parent');
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   
   const [email, setEmail] = useState('');
@@ -16,11 +16,6 @@ const AuthScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  // Bank details for school owners
-  const [bankName, setBankName] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  
   const { login, signup, schools, isAuthenticated, userRole } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,16 +38,6 @@ const AuthScreen: React.FC = () => {
             setError('Phone number is required for contact updates.');
             return;
         }
-        if (roleSelection === 'school_owner') {
-            if (!selectedSchoolId) {
-                setError('Please select the school you own.');
-                return;
-            }
-            if (!bankName || !accountName || !accountNumber) {
-                setError('Please provide complete banking details for settlements.');
-                return;
-            }
-        }
     }
     
     if (mode === 'login') {
@@ -65,11 +50,9 @@ const AuthScreen: React.FC = () => {
             setError('Invalid email or password. Please try again.');
         }
     } else {
-        const bankDetails = roleSelection === 'school_owner' ? { bankName, accountName, accountNumber } : undefined;
-        const success = signup(fullName, email, phoneNumber, password, roleSelection, selectedSchoolId, bankDetails);
+        const success = signup(fullName, email, phoneNumber, password, roleSelection, selectedSchoolId);
         if (success) {
-            if (roleSelection === 'school_owner') navigate('/school-owner-dashboard', { replace: true });
-            else navigate('/dashboard', { replace: true });
+            navigate('/dashboard', { replace: true });
         } else {
             setError('Email already registered.');
         }
@@ -91,13 +74,6 @@ const AuthScreen: React.FC = () => {
         icon: 'school', 
         color: 'bg-purple-500' 
     },
-    { 
-        id: 'school_owner', 
-        title: 'School Owner', 
-        desc: 'I want to manage fee collections for my institution', 
-        icon: 'account_balance', 
-        color: 'bg-secondary' 
-    },
   ] as const;
 
   return (
@@ -115,7 +91,7 @@ const AuthScreen: React.FC = () => {
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-2 mb-2">
             <span className="material-symbols-outlined text-4xl text-primary filled">account_balance</span>
-            <h1 className="text-3xl font-extrabold tracking-tight">LOPAY</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-text-primary-light dark:text-text-primary-dark">LOPAY</h1>
           </div>
           <p className="text-text-secondary-light dark:text-text-secondary-dark text-sm font-medium">
             Smart School Fee Management
@@ -149,7 +125,7 @@ const AuthScreen: React.FC = () => {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setRoleSelection(opt.id)}
+                    onClick={() => setRoleSelection(opt.id as 'parent' | 'university_student')}
                     className={`relative flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 ${
                         isSelected 
                         ? 'border-primary bg-primary/5 shadow-md shadow-primary/5' 
@@ -190,7 +166,7 @@ const AuthScreen: React.FC = () => {
             </div>
           )}
 
-          {mode === 'signup' && (roleSelection === 'school_owner' || roleSelection === 'university_student') && (
+          {mode === 'signup' && roleSelection === 'university_student' && (
             <div className="space-y-1.5 animate-fade-in-up">
               <label className="text-xs font-bold text-text-secondary-light uppercase px-1">Select Institution</label>
               <select 
@@ -203,42 +179,6 @@ const AuthScreen: React.FC = () => {
                 {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-          )}
-
-          {mode === 'signup' && roleSelection === 'school_owner' && (
-             <div className="p-5 bg-secondary/5 rounded-2xl border border-secondary/20 space-y-4 animate-fade-in-up">
-                <p className="text-[10px] font-extrabold text-secondary uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">payments</span>
-                    Settlement Bank Account
-                </p>
-                <div className="space-y-3">
-                    <input
-                        type="text"
-                        required
-                        placeholder="Bank Name (e.g. Opay, Zenith)"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                    <input
-                        type="text"
-                        required
-                        placeholder="Account Number"
-                        maxLength={10}
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                    <input
-                        type="text"
-                        required
-                        placeholder="Full Account Holder Name"
-                        value={accountName}
-                        onChange={(e) => setAccountName(e.target.value)}
-                        className="w-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm"
-                    />
-                </div>
-             </div>
           )}
           
           <div className="space-y-1.5">
