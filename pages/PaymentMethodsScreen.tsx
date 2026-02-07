@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Header } from '../components/Header';
@@ -11,6 +11,7 @@ const PaymentMethodsScreen: React.FC = () => {
   const { submitPayment, childrenData, schools, allUsers, userRole } = useApp();
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const state = location.state as { paymentType?: string, amount?: number, childId?: string, allowCustom?: boolean, isCustomOnly?: boolean } | null;
   const isPaymentFlow = state?.paymentType === 'installment';
@@ -63,12 +64,27 @@ const PaymentMethodsScreen: React.FC = () => {
     alert("Account number copied!");
   };
 
-  const handleSnapReceipt = () => {
-      setReceiptImage('https://images.unsplash.com/photo-1554224155-169641357599?auto=format&fit=crop&q=80&w=400');
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handlePaymentSent = () => {
       if (state?.childId && paymentAmount > 0) {
+          if (!receiptImage) {
+            alert("Please upload a proof of payment receipt before proceeding.");
+            return;
+          }
           setIsProcessing(true);
           setTimeout(() => {
               submitPayment(state.childId!, paymentAmount, receiptImage || undefined);
@@ -86,6 +102,14 @@ const PaymentMethodsScreen: React.FC = () => {
       <Header title={activeBankDetails.isLopayEscrow ? "Activation Deposit" : `${entityType} Payment`} />
       <div className="p-6 flex flex-col flex-1 overflow-y-auto pb-safe">
           
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            className="hidden" 
+          />
+
           <div className="mb-6 p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800 flex items-center gap-4 animate-fade-in">
               <div className={`size-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg ${activeBankDetails.isLopayEscrow ? 'bg-primary' : 'bg-success'}`}>
                   <span className="material-symbols-outlined text-2xl">
@@ -182,21 +206,21 @@ const PaymentMethodsScreen: React.FC = () => {
           <div className="mb-6">
               <p className="text-[10px] font-black text-text-secondary-light uppercase tracking-widest mb-2 px-1">Proof of Transfer</p>
               {receiptImage ? (
-                  <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 h-32">
+                  <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 h-48 shadow-lg">
                       <img src={receiptImage} alt="Receipt" className="w-full h-full object-cover" />
-                      <button onClick={() => setReceiptImage(null)} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1">
-                          <span className="material-symbols-outlined text-xs">close</span>
+                      <button onClick={() => setReceiptImage(null)} className="absolute top-3 right-3 bg-black/60 text-white rounded-full p-2 hover:bg-black/80 transition-colors backdrop-blur-sm">
+                          <span className="material-symbols-outlined text-sm">close</span>
                       </button>
                   </div>
               ) : (
                   <button 
-                    onClick={handleSnapReceipt}
-                    className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-text-secondary-light group"
+                    onClick={triggerFileInput}
+                    className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-text-secondary-light group animate-pulse hover:animate-none"
                   >
                       <div className="size-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center transition-colors group-hover:bg-primary group-hover:text-white">
                           <span className="material-symbols-outlined">photo_camera</span>
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-tight">Upload Payment Receipt</span>
+                      <span className="text-xs font-bold uppercase tracking-tight">Tap to snap or upload receipt</span>
                   </button>
               )}
           </div>
