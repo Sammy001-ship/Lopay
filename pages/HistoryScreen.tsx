@@ -8,9 +8,11 @@ import { useApp } from '../context/AppContext';
 const HistoryScreen: React.FC = () => {
   const { transactions, userRole } = useApp();
   const [filter, setFilter] = useState<'All' | 'Successful' | 'Pending' | 'Failed'>('All');
+  const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
 
   const filteredTransactions = transactions.filter(t => filter === 'All' ? true : t.status === filter);
   const isSchoolOwner = userRole === 'school_owner';
+  const isOwner = userRole === 'owner';
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -32,7 +34,7 @@ const HistoryScreen: React.FC = () => {
 
   return (
     <Layout showBottomNav>
-      <Header title={userRole === 'owner' ? "All Platform Transactions" : isSchoolOwner ? "School Collection History" : "Payment History"} />
+      <Header title={isOwner ? "All Platform Transactions" : isSchoolOwner ? "School Collection History" : "Payment History"} />
       <div className="flex flex-col gap-4 px-4 py-4">
          {/* Search Bar */}
          <div className="relative">
@@ -76,9 +78,9 @@ const HistoryScreen: React.FC = () => {
                                 <div className={`size-12 rounded-2xl flex items-center justify-center text-white shrink-0 ${t.status === 'Successful' ? 'bg-success shadow-lg shadow-success/20' : 'bg-warning shadow-lg shadow-warning/20'}`}>
                                     <span className="material-symbols-outlined text-2xl">{t.status === 'Successful' ? 'payments' : 'sync'}</span>
                                 </div>
-                                <div>
-                                    <h3 className="font-black text-sm text-text-primary-light dark:text-text-primary-dark tracking-tight">{t.childName}</h3>
-                                    <p className="text-[10px] text-text-secondary-light font-bold uppercase tracking-widest mt-0.5">{isSchoolOwner ? "Received Inflow" : t.schoolName}</p>
+                                <div className="overflow-hidden">
+                                    <h3 className="font-black text-sm text-text-primary-light dark:text-text-primary-dark tracking-tight truncate max-w-[150px]">{t.childName}</h3>
+                                    <p className="text-[10px] text-text-secondary-light font-bold uppercase tracking-widest mt-0.5 truncate">{isSchoolOwner ? "Received Inflow" : t.schoolName}</p>
                                 </div>
                              </div>
                              <div className="text-right">
@@ -88,9 +90,19 @@ const HistoryScreen: React.FC = () => {
                          </div>
                          <div className="flex justify-between items-center pt-4 border-t border-gray-50 dark:border-gray-800">
                              <span className="text-[10px] font-bold text-text-secondary-light uppercase tracking-widest">{t.date}</span>
-                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${getStatusColor(t.status)} shadow-sm`}>
-                                 <div className={`size-1.5 rounded-full ${getStatusDot(t.status)} animate-pulse`}></div>
-                                 {t.status}
+                             <div className="flex items-center gap-2">
+                                 {t.receiptUrl && (
+                                     <button 
+                                        onClick={() => setSelectedReceipt(t.receiptUrl!)}
+                                        className="px-2.5 py-1 rounded-lg bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest border border-primary/10 hover:bg-primary/10 transition-colors"
+                                     >
+                                         View Receipt
+                                     </button>
+                                 )}
+                                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${getStatusColor(t.status)} shadow-sm`}>
+                                     <div className={`size-1.5 rounded-full ${getStatusDot(t.status)} animate-pulse`}></div>
+                                     {t.status}
+                                 </div>
                              </div>
                          </div>
                      </div>
@@ -98,6 +110,26 @@ const HistoryScreen: React.FC = () => {
              )}
          </div>
       </div>
+
+      {/* Receipt Preview Modal */}
+      {selectedReceipt && (
+          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-6 items-center justify-center" onClick={() => setSelectedReceipt(null)}>
+              <div className="w-full max-w-md bg-white dark:bg-card-dark rounded-3xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => setSelectedReceipt(null)}
+                    className="absolute top-4 right-4 z-10 size-10 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                  >
+                      <span className="material-symbols-outlined">close</span>
+                  </button>
+                  <img src={selectedReceipt} alt="Receipt Full" className="w-full h-auto max-h-[75vh] object-contain" />
+                  <div className="p-6 bg-white dark:bg-card-dark border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-[10px] font-black text-text-secondary-light uppercase tracking-widest mb-4 text-center">Verified Payment Proof</p>
+                      <button onClick={() => setSelectedReceipt(null)} className="w-full py-4 bg-primary text-white rounded-xl font-bold uppercase text-sm tracking-widest shadow-lg shadow-primary/20">Close Preview</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <BottomNav />
     </Layout>
   );

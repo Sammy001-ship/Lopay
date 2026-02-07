@@ -11,6 +11,7 @@ const SchoolOwnerDashboard: React.FC = () => {
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedClass, setSelectedClass] = useState<string>('All');
+  const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const CLASS_GROUPS = [
@@ -315,7 +316,11 @@ const SchoolOwnerDashboard: React.FC = () => {
                     </div>
                 ) : (
                     schoolTransactions.slice(0, 5).map(tx => (
-                        <div key={tx.id} className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex justify-between items-center transition-all hover:border-primary/20">
+                        <div 
+                            key={tx.id} 
+                            onClick={() => tx.receiptUrl && setSelectedReceipt(tx.receiptUrl)}
+                            className="bg-white dark:bg-card-dark p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex justify-between items-center transition-all hover:border-primary/20 cursor-pointer active:scale-95"
+                        >
                             <div className="flex items-center gap-3">
                                 <div className={`size-10 rounded-xl flex items-center justify-center text-white ${tx.status === 'Successful' ? 'bg-success shadow-lg shadow-success/20' : 'bg-warning shadow-lg shadow-warning/20'}`}>
                                     <span className="material-symbols-outlined text-xl">{tx.status === 'Successful' ? 'check' : 'sync'}</span>
@@ -325,9 +330,12 @@ const SchoolOwnerDashboard: React.FC = () => {
                                     <p className="text-[9px] text-text-secondary-light font-bold uppercase tracking-widest">{tx.date}</p>
                                 </div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex flex-col items-end">
                                 <p className="text-sm font-black text-text-primary-light dark:text-text-primary-dark">₦{tx.amount.toLocaleString()}</p>
-                                <p className={`text-[8px] font-black uppercase tracking-[0.15em] ${tx.status === 'Successful' ? 'text-success' : 'text-warning'}`}>{tx.status}</p>
+                                <div className="flex items-center gap-1.5">
+                                    {tx.receiptUrl && <span className="material-symbols-outlined text-[10px] text-primary">image</span>}
+                                    <p className={`text-[8px] font-black uppercase tracking-[0.15em] ${tx.status === 'Successful' ? 'text-success' : 'text-warning'}`}>{tx.status}</p>
+                                </div>
                             </div>
                         </div>
                     ))
@@ -370,6 +378,25 @@ const SchoolOwnerDashboard: React.FC = () => {
             </div>
         </div>
       </main>
+
+      {/* Receipt Preview Modal */}
+      {selectedReceipt && (
+          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-6 items-center justify-center" onClick={() => setSelectedReceipt(null)}>
+              <div className="w-full max-w-md bg-white dark:bg-card-dark rounded-3xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => setSelectedReceipt(null)}
+                    className="absolute top-4 right-4 z-10 size-10 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-md hover:bg-black/70 transition-colors"
+                  >
+                      <span className="material-symbols-outlined">close</span>
+                  </button>
+                  <img src={selectedReceipt} alt="Receipt Full" className="w-full h-auto max-h-[75vh] object-contain" />
+                  <div className="p-6 bg-white dark:bg-card-dark border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-[10px] font-black text-text-secondary-light uppercase tracking-widest mb-4 text-center">Verified Payment Proof</p>
+                      <button onClick={() => setSelectedReceipt(null)} className="w-full py-4 bg-primary text-white rounded-xl font-bold uppercase text-sm tracking-widest shadow-lg shadow-primary/20">Close Preview</button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isOwnerAccount && (
         <button
