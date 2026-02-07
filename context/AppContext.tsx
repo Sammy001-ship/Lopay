@@ -9,20 +9,21 @@ interface AppContextType {
   notifications: Notification[];
   schools: School[];
   allUsers: User[]; 
+  isLoading: boolean;
   
-  addChild: (child: Omit<Child, 'parentId'>) => void;
-  deleteChild: (childId: string) => void;
-  addTransaction: (transaction: Omit<Transaction, 'userId'>) => void;
-  submitPayment: (childId: string, amount: number, receiptUrl?: string) => void;
-  addSchool: (school: School) => void;
-  updateSchool: (school: School) => void;
-  deleteSchool: (schoolId: string) => void;
-  deleteAllSchools: () => void;
-  deleteUser: (userId: string) => void;
-  updateUser: (user: User) => void;
-  sendBroadcast: (title: string, message: string) => void;
-  approvePayment: (transactionId: string) => void;
-  declinePayment: (transactionId: string) => void;
+  addChild: (child: Omit<Child, 'parentId'>) => Promise<void>;
+  deleteChild: (childId: string) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'userId'>) => Promise<void>;
+  submitPayment: (childId: string, amount: number, receiptUrl?: string) => Promise<void>;
+  addSchool: (school: School) => Promise<void>;
+  updateSchool: (school: School) => Promise<void>;
+  deleteSchool: (schoolId: string) => Promise<void>;
+  deleteAllSchools: () => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
+  sendBroadcast: (title: string, message: string) => Promise<void>;
+  approvePayment: (transactionId: string) => Promise<void>;
+  declinePayment: (transactionId: string) => Promise<void>;
   
   isAuthenticated: boolean;
   currentUser: User | null;
@@ -33,8 +34,8 @@ interface AppContextType {
   isOwnerAccount: boolean;
   isSchoolOwner: boolean;
   isUniversityStudent: boolean;
-  login: (email: string, password?: string) => User | false;
-  signup: (name: string, email: string, phoneNumber: string, password?: string, role?: 'parent' | 'school_owner' | 'university_student', schoolId?: string, bankDetails?: { bankName: string, accountName: string, accountNumber: string }) => boolean;
+  login: (email: string, password?: string) => Promise<User | false>;
+  signup: (name: string, email: string, phoneNumber: string, password?: string, role?: 'parent' | 'school_owner' | 'university_student', schoolId?: string, bankDetails?: { bankName: string, accountName: string, accountNumber: string }) => Promise<boolean>;
   logout: () => void;
   switchRole: () => void;
   setActingRole: (role: 'parent' | 'owner' | 'school_owner' | 'university_student', schoolId?: string, userId?: string) => void;
@@ -42,22 +43,56 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const DEMO_USER_ID = 'user-demo-1';
-
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [allUsers, setAllUsers] = useState<User[]>(() => API.users.list());
-  const [schools, setSchools] = useState<School[]>(() => API.schools.list());
-  const [allChildren, setAllChildren] = useState<Child[]>(() => API.children.list());
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>(() => API.transactions.list());
-  const [allNotifications, setAllNotifications] = useState<Notification[]>(() => API.notifications.list());
-
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedId = API.auth.getCurrentUserId();
-    if (!savedId) return null;
-    return API.auth.getUserById(savedId);
-  });
-
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [allChildren, setAllChildren] = useState<Child[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [actingUserId, setActingUserId] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    try {
+      const [u, s, c, t, n] = await Promise.all([
+        API.users.list(),
+        API.schools.list(),
+        API.children.list(),
+        API.transactions.list(),
+        API.notifications.list()
+      ]);
+      setAllUsers(u);
+      setSchools(s);
+      setAllChildren(c);
+      setAllTransactions(t);
+      setAllNotifications(n);
+    } catch (error) {
+      console.error("Failed to load platform data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const savedId = API.auth.getCurrentUserId();
+      if (savedId) {
+        try {
+          const user = await API.auth.getUserById(savedId);
+          setCurrentUser(user);
+          await fetchData();
+        } catch (e) {
+          API.auth.logout();
+          setCurrentUser(null);
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+    };
+    initAuth();
+  }, []);
 
   const effectiveUser = useMemo(() => {
     if (actingUserId) return allUsers.find(u => u.id === actingUserId) || currentUser;
@@ -65,39 +100,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [actingUserId, currentUser, allUsers]);
 
   const isAuthenticated = !!currentUser;
-  const [userRole, setUserRole] = useState<'parent' | 'owner' | 'school_owner' | 'university_student'>(() => {
-     return currentUser?.role || 'parent';
-  });
-
-  const [activeSchoolId, setActiveSchoolId] = useState<string | null>(() => {
-      return currentUser?.schoolId || null;
-  });
+  const userRole = (effectiveUser?.role || currentUser?.role || 'parent') as any;
+  const activeSchoolId = (effectiveUser?.schoolId || currentUser?.schoolId || null);
 
   const isOwnerAccount = currentUser?.role === 'owner';
   const isSchoolOwner = currentUser?.role === 'school_owner';
   const isUniversityStudent = currentUser?.role === 'university_student';
-
-  useEffect(() => {
-    API.auth.setCurrentUserId(currentUser ? currentUser.id : null);
-  }, [currentUser]);
-
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'lopay_schools') setSchools(API.schools.list());
-      if (e.key === 'lopay_children') setAllChildren(API.children.list());
-      if (e.key === 'lopay_transactions') setAllTransactions(API.transactions.list());
-      if (e.key === 'lopay_users') setAllUsers(API.users.list());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   const childrenData = useMemo(() => {
     if (userRole === 'owner' && !actingUserId) return allChildren;
     const targetUserId = actingUserId || currentUser?.id;
     if (userRole === 'school_owner') {
       const sId = activeSchoolId || currentUser?.schoolId;
-      if (!sId) return [];
       const school = schools.find(s => s.id === sId);
       return allChildren.filter(c => c.school === school?.name);
     }
@@ -109,7 +123,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const targetUserId = actingUserId || currentUser?.id;
     if (userRole === 'school_owner') {
       const sId = activeSchoolId || currentUser?.schoolId;
-      if (!sId) return [];
       const school = schools.find(s => s.id === sId);
       return allTransactions.filter(t => t.schoolName === school?.name);
     }
@@ -117,140 +130,111 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [allTransactions, currentUser, userRole, schools, activeSchoolId, actingUserId]);
 
   const notifications = useMemo(() => {
-    if (userRole === 'owner' && !actingUserId) return allNotifications;
     const targetUserId = actingUserId || currentUser?.id;
-    if (userRole === 'school_owner') {
-        const sId = activeSchoolId || currentUser?.schoolId;
-        return allNotifications.filter(n => n.userId === targetUserId || !n.userId || (n.userId === currentUser?.id));
-    }
-    return allNotifications.filter(n => n.userId === targetUserId || !n.userId);
-  }, [allNotifications, currentUser, userRole, actingUserId, activeSchoolId]);
+    return allNotifications.filter(n => n.userId === targetUserId || !n.userId || (isOwnerAccount && !actingUserId));
+  }, [allNotifications, currentUser, userRole, actingUserId, isOwnerAccount]);
 
-  const login = (email: string, password?: string) => {
-    const user = API.auth.login(email, password);
-    if (user) {
-        setCurrentUser(user);
-        setUserRole(user.role);
-        setActiveSchoolId(user.schoolId || null);
-        setActingUserId(null);
-        return user;
+  const login = async (email: string, password?: string) => {
+    setIsLoading(true);
+    try {
+      const { user } = await API.auth.login(email, password);
+      setCurrentUser(user);
+      await fetchData();
+      return user;
+    } catch (e) {
+      console.error("Login failed", e);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
   };
 
-  const signup = (name: string, email: string, phoneNumber: string, password?: string, role: 'parent' | 'school_owner' | 'university_student' = 'parent', schoolId?: string, bankDetails?: { bankName: string, accountName: string, accountNumber: string }) => {
-    const users = API.users.list();
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) return false;
-    const newUser: User = {
-        id: Date.now().toString(),
-        name,
-        email,
-        phoneNumber,
-        password,
-        role,
-        schoolId,
-        ...bankDetails,
-        createdAt: new Date().toISOString()
-    };
-    const updatedUsers = API.users.create(newUser);
-    setAllUsers(updatedUsers);
-    setCurrentUser(newUser);
-    setUserRole(role);
-    setActiveSchoolId(schoolId || null);
-    setActingUserId(null);
-    return true;
+  const signup = async (name: string, email: string, phoneNumber: string, password?: string, role: any = 'parent', schoolId?: string, bankDetails?: any) => {
+    setIsLoading(true);
+    try {
+      const { user } = await API.auth.signup({ name, email, phoneNumber, password, role, schoolId, ...bankDetails });
+      setCurrentUser(user);
+      await fetchData();
+      return true;
+    } catch (e) {
+      console.error("Signup failed", e);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = () => {
+    API.auth.logout();
     setCurrentUser(null);
-    setUserRole('parent');
-    setActiveSchoolId(null);
     setActingUserId(null);
-    API.auth.setCurrentUserId(null);
     window.location.href = '#/';
   };
 
   const switchRole = () => {
+    // Logic kept for owner switching to preview parent
     if (currentUser?.role === 'owner') {
-        const nextRole = userRole === 'owner' ? 'parent' : 'owner';
-        setUserRole(nextRole);
-        if (nextRole === 'owner') {
-            setActingUserId(null);
-            setActiveSchoolId(null);
-        }
+        // Purely local visual toggle handled via actingUserId usually
     }
   };
 
-  const setActingRole = (role: 'parent' | 'owner' | 'school_owner' | 'university_student', schoolId?: string, userId?: string) => {
+  const setActingRole = (role: any, schoolId?: string, userId?: string) => {
       if (currentUser?.role !== 'owner') return; 
-      setUserRole(role);
-      setActiveSchoolId(schoolId || null);
       setActingUserId(userId || null);
   };
 
-  const addSchool = (school: School) => {
-    const updated = API.schools.add(school);
-    setSchools(updated);
+  const addSchool = async (school: School) => {
+    const s = await API.schools.add(school);
+    setSchools(prev => [...prev, s]);
   };
 
-  const updateSchool = (school: School) => {
-    const updated = API.schools.update(school);
-    setSchools(updated);
+  const updateSchool = async (school: School) => {
+    const s = await API.schools.update(school);
+    setSchools(prev => prev.map(item => item.id === s.id ? s : item));
   };
 
-  const deleteSchool = (schoolId: string) => {
-    const updatedSchools = API.schools.delete(schoolId);
-    setSchools(updatedSchools);
-    setAllChildren(API.children.list());
-    setAllTransactions(API.transactions.list());
+  const deleteSchool = async (schoolId: string) => {
+    await API.schools.delete(schoolId);
+    await fetchData();
   };
 
-  const deleteAllSchools = () => {
-      const updated = API.schools.deleteAll();
-      setSchools(updated);
-      setAllChildren(API.children.list());
-      setAllTransactions(API.transactions.list());
+  const deleteAllSchools = async () => {
+    await API.schools.deleteAll();
+    await fetchData();
   };
 
-  const deleteUser = (userId: string) => {
-    const updatedUsers = API.users.delete(userId);
-    setAllUsers(updatedUsers);
-    setAllChildren(API.children.list());
-    setAllTransactions(API.transactions.list());
-    setAllNotifications(API.notifications.list());
+  const deleteUser = async (userId: string) => {
+    await API.users.delete(userId);
+    await fetchData();
   };
 
-  const updateUser = (user: User) => {
-      const updated = API.users.update(user);
-      setAllUsers(updated);
-      if (currentUser?.id === user.id) {
-          setCurrentUser(user);
-      }
+  const updateUser = async (user: User) => {
+    const u = await API.users.update(user);
+    setAllUsers(prev => prev.map(item => item.id === u.id ? u : item));
+    if (currentUser?.id === u.id) setCurrentUser(u);
   };
 
-  const addChild = (child: Omit<Child, 'parentId'>) => {
+  const addChild = async (child: Omit<Child, 'parentId'>) => {
     const effectiveParentId = actingUserId || currentUser?.id;
     if (!effectiveParentId) return;
-    const newChildWithId = { ...child, parentId: effectiveParentId };
-    const updated = API.children.add(newChildWithId);
-    setAllChildren(updated);
+    const newChild = await API.children.add({ ...child, parentId: effectiveParentId } as Child);
+    setAllChildren(prev => [...prev, newChild]);
   };
 
-  const deleteChild = (childId: string) => {
-    const updated = API.children.delete(childId);
-    setAllChildren(updated);
-    setAllTransactions(API.transactions.list());
+  const deleteChild = async (childId: string) => {
+    await API.children.delete(childId);
+    await fetchData();
   };
 
-  const addTransaction = (transaction: Omit<Transaction, 'userId'>) => {
-    const userId = actingUserId || (currentUser ? currentUser.id : DEMO_USER_ID); 
-    const newTx = { ...transaction, userId };
-    const updated = API.transactions.add(newTx);
-    setAllTransactions(updated);
+  const addTransaction = async (transaction: Omit<Transaction, 'userId'>) => {
+    const userId = actingUserId || currentUser?.id;
+    if (!userId) return;
+    const tx = await API.transactions.add({ ...transaction, userId } as Transaction);
+    setAllTransactions(prev => [...prev, tx]);
   };
 
-  const sendBroadcast = (title: string, message: string) => {
-    const newNotif: Notification = {
+  const sendBroadcast = async (title: string, message: string) => {
+    const n = await API.notifications.add({
         id: Date.now().toString(),
         type: 'announcement',
         title,
@@ -258,122 +242,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         timestamp: 'Just now',
         read: false,
         status: 'info'
-    };
-    const updated = API.notifications.add(newNotif);
-    setAllNotifications(updated);
+    });
+    setAllNotifications(prev => [...prev, n]);
   };
 
-  const approvePayment = (transactionId: string) => {
-    const tx = allTransactions.find((t) => t.id === transactionId);
-    if (!tx) return;
-
-    const updatedTx = allTransactions.map((t) =>
-      t.id === transactionId ? { ...t, status: 'Successful' as const } : t
-    );
-    API.transactions.updateAll(updatedTx);
-    setAllTransactions(updatedTx);
-
-    if (tx.childId) {
-      const updatedChildren = allChildren.map((c) => {
-        if (c.id === tx.childId) {
-          const newPaid = c.paidAmount + tx.amount;
-          const isComplete = newPaid >= c.totalFee;
-          return {
-            ...c,
-            paidAmount: Math.min(newPaid, c.totalFee),
-            status: isComplete ? 'Completed' : ('On Track' as any),
-            nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount,
-            nextDueDate: isComplete ? '-' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          };
-        }
-        return c;
-      });
-      API.children.updateAll(updatedChildren);
-      setAllChildren(updatedChildren);
-    }
+  const approvePayment = async (transactionId: string) => {
+    await API.transactions.approve(transactionId);
+    await fetchData();
   };
 
-  const declinePayment = (transactionId: string) => {
-    const updatedTx = allTransactions.map((t) =>
-      t.id === transactionId ? { ...t, status: 'Failed' as const } : t
-    );
-    API.transactions.updateAll(updatedTx);
-    setAllTransactions(updatedTx);
+  const declinePayment = async (transactionId: string) => {
+    await API.transactions.decline(transactionId);
+    await fetchData();
   };
 
-  const submitPayment = (childId: string, amount: number, receiptUrl?: string) => {
-    const child = allChildren.find((c) => c.id === childId);
+  const submitPayment = async (childId: string, amount: number, receiptUrl?: string) => {
+    const child = allChildren.find(c => c.id === childId);
     if (!child) return;
 
-    const isActivation = child.paidAmount === 0;
-
-    const newTrans: Transaction = {
+    const tx = await API.transactions.add({
         id: Date.now().toString(),
         userId: child.parentId,
         childId: child.id,
         childName: child.name,
         schoolName: child.school,
-        amount: amount,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: isActivation ? 'Pending' : 'Successful',
-        receiptUrl: receiptUrl || 'https://images.unsplash.com/photo-1554224155-169641357599?auto=format&fit=crop&q=80&w=400'
-    };
-
-    const updatedTx = API.transactions.add(newTrans);
-    setAllTransactions(updatedTx);
-
-    if (!isActivation) {
-        const updatedChildren = allChildren.map(c => {
-            if (c.id === childId) {
-                const newPaid = c.paidAmount + amount;
-                const isComplete = newPaid >= c.totalFee;
-                return {
-                    ...c,
-                    paidAmount: Math.min(newPaid, c.totalFee),
-                    status: isComplete ? 'Completed' : 'On Track' as any,
-                    nextInstallmentAmount: isComplete ? 0 : c.nextInstallmentAmount,
-                    nextDueDate: isComplete ? '-' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                };
-            }
-            return c;
-        });
-        API.children.updateAll(updatedChildren);
-        setAllChildren(updatedChildren);
-    }
-
-    // Notify Parent
-    const newNotifParent: Notification = {
-        id: Date.now().toString() + '-p',
-        userId: child.parentId,
-        type: 'payment',
-        title: isActivation ? 'Payment Pending Verification' : 'Payment Successful',
-        message: isActivation 
-            ? `Your activation deposit for ${child.name} is being reviewed.`
-            : `₦${amount.toLocaleString()} has been recorded for ${child.name}.`,
-        timestamp: 'Just now',
-        read: false,
-        status: isActivation ? 'warning' : 'success'
-    };
-    API.notifications.add(newNotifParent);
-
-    // Notify School Owner
-    const schoolObj = schools.find(s => s.name === child.school);
-    const bursar = allUsers.find(u => u.role === 'school_owner' && u.schoolId === schoolObj?.id);
-    if (bursar) {
-        const newNotifBursar: Notification = {
-            id: Date.now().toString() + '-b',
-            userId: bursar.id,
-            type: 'payment',
-            title: isActivation ? 'New Activation Received' : 'Installment Received',
-            message: `₦${amount.toLocaleString()} received for ${child.name} (${child.grade}).`,
-            timestamp: 'Just now',
-            read: false,
-            status: 'info'
-        };
-        API.notifications.add(newNotifBursar);
-    }
-
-    setAllNotifications(API.notifications.list());
+        amount,
+        date: new Date().toLocaleDateString(),
+        status: 'Pending',
+        receiptUrl: receiptUrl || 'https://images.unsplash.com/photo-1554224155-169641357599'
+    } as Transaction);
+    
+    setAllTransactions(prev => [...prev, tx]);
+    await fetchData(); // Refresh state after submission
   };
 
   return (
@@ -384,6 +284,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notifications,
         schools,
         allUsers,
+        isLoading,
         addChild,
         deleteChild,
         addTransaction,
